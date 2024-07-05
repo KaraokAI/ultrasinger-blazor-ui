@@ -1,0 +1,22 @@
+@page "/"
+@using UltraSingerUI.Components.Pages.Components
+
+<CascadingValue Value="SongProcessorService">
+    <div class="flex flex-col dark w-full h-full mic-backdrop">
+        <div class="flex-grow flex flex-col h-full w-full">
+            <div class="flex flex-row h-full">
+                <div class="md:w-1/2 w-full text-lg h-full">
+                    <div class="flex flex-col">
+                        <History/>
+                    </div>
+                </div>
+                <div class="output md:w-1/2 w-full hidden md:block shadow-md rounded-md px-6 bg-gray-900 text-white overflow-auto">
+                    <OutputReading/>
+                </div>
+            </div>
+        </div>
+        <div class="flex flex-col w-full">
+            <AddSong />
+        </div>
+    </div>
+</CascadingValue>

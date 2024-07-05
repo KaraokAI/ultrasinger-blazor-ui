@@ -1,0 +1,36 @@
+@using UltraSingerUI.Entities
+
+<h3>
+    Download Queue
+</h3>
+<div class="h-full">
+    <ol>
+        @foreach ((var song, int i) in SongProcessorService.GetProcessedSongList().Select((x, i) => (x, i)))
+        {
+            <li>
+                @(i + 1). <a class="underline" href="@song.Url">@(song.FriendlyName)</a>
+                <span class="px-1">
+                    @switch (song.JobState)
+                    {
+                        case SongState.NOT_STARTED:
+                            <Text>⌛</Text>
+                            break;
+                        case SongState.COMPLETED:
+                            <Text>✅</Text>
+                            break;
+                        case SongState.FAILED:
+                            <Text>☹</Text>
+                            break;
+                        case SongState.IN_PROGRESS:
+                            <Text>🛠</Text>
+                            break;
+                        default:
+                            <Text>❓</Text>
+                            break;
+                    }
+                </span>
+                <span>@(FormatDuration(song))</span>
+            </li>
+        }
+    </ol>
+</div>

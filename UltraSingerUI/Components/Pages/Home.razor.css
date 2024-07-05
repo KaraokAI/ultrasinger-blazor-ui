@@ -1,0 +1,10 @@
+.output {
+    height: 60vh;
+}
+
+.mic-backdrop {
+    background: url("ascii-art.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    filter: invert();
+}
