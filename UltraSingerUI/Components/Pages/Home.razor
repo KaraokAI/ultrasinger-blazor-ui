@@ -1,0 +1,36 @@
+@page "/"
+
+<div class="flex flex-col dark w-full">
+    <div class="flex flex-col flex-grow">
+        <h3>
+            Last Added (updated at @($"{LastCheck:T}"))
+        </h3>
+        <div class=scroll>
+            <ol>
+                @foreach ((var song, int i) in SongProcessorService.GetProcessedSongList().Select((x, i) => (x, i)))
+                {
+                    <li>
+                        @(i). @(song.FriendlyName) @(song.Processed ? "\u2705" : "\u231b")
+                    </li>
+                }
+            </ol>
+        </div>
+    </div>
+    <div class="flex-grow"></div>
+    <div class="flex flex-col py-5 w-full">
+        <div class="py-2 w-full">
+            <InputText class="w-full" @bind-Value="SongUrl" placeholder="Enter YouTube URL here..."/>
+        </div>
+        <a href="#" @onclick="@AddToQueue" class="@($" relative inline-block text-lg group {(SongUrl?.Length > 0 ? "" : "disabled")}")">
+            <span class="relative z-10 block px-5 py-3 overflow-hidden font-medium leading-tight text-gray-800 transition-colors duration-300 ease-out border-2 border-gray-900 rounded-lg group-hover:text-white">
+                <span class="w-full absolute inset-0 w-full h-full px-5 py-3 rounded-lg bg-gray-50"></span>
+                <span class="w-full absolute left-0 w-48 h-48 -ml-2 transition-all duration-300 origin-top-right -rotate-90 -translate-x-full translate-y-12 bg-gray-900 group-hover:-rotate-180 ease"></span>
+                <span class="w-full relative">Add to queue</span>
+            </span>
+            <span class="absolute bottom-0 right-0 w-full h-12 -mb-1 -mr-1 transition-all duration-200 ease-linear bg-gray-900 rounded-lg group-hover:mb-0 group-hover:mr-0" data-rounded="rounded-lg"></span>
+        </a>
+        <button class="">
+
+        </button>
+    </div>
+</div>
