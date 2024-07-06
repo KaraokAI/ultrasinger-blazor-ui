@@ -1,31 +1,34 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Text;
+using YoutubeDLSharp;
+using YoutubeDLSharp.Options;
 
 namespace UltraSingerUI.Services;
 
 public class YTDLPService
 {
+    private static bool FirstRun { get; set; } 
+    
     public async Task<string?> GetTitleOfVideo(string url)
     {
-        Process ytdlp = new Process();
-        StringBuilder outputStringBuilder = new StringBuilder();
-        ytdlp.OutputDataReceived += (sender, eventArgs) =>
-        {
-            Console.WriteLine(eventArgs.Data);
-            outputStringBuilder.AppendLine(eventArgs.Data);
-        };
-        
-        ytdlp.StartInfo = new ProcessStartInfo
-        {
-            FileName = "yt-dlp",
-            Arguments = $"--print title {url}",
-            RedirectStandardOutput = true,
-        };
+        var ytdl = new YoutubeDL();
 
-        ytdlp.Start();
-        ytdlp.BeginOutputReadLine();
-        
-        await ytdlp.WaitForExitAsync();
-        return outputStringBuilder.ToString();
+        if (FirstRun)
+        {
+            await ytdl.RunUpdate();
+            FirstRun = false;
+        }
+
+        var result = await ytdl.RunWithOptions(url, new OptionSet()
+        {
+            Print = "all",
+            IgnoreErrors = true,
+            Verbose = true,
+        });
+
+        return result.Success && !string.IsNullOrWhiteSpace(result.Data)
+            ? result.Data
+            : null;
     }
 }

@@ -6,9 +6,9 @@ public record Song
     
     public string? Title { get; set; }
     
-    public bool Processed { get; set; }
-    
     public string? JobId { get; set; }
+
+    public SongState JobState { get; set; } = SongState.UNKNOWN;
 
     public string FriendlyName => Title ?? Url;
     

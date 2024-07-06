@@ -12,7 +12,8 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHangfire(configuration => configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseInMemoryStorage());
+    .UseInMemoryStorage()
+    .UseFilter(new AutomaticRetryAttribute { Attempts = 0 }));
 
 builder.Services
     .AddHangfireServer(conf =>
