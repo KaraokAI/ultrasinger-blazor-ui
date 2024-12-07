@@ -1,0 +1,19 @@
+.yt-title {
+    text-shadow: 1px 1px 2px orange, 0 0 1em white, 0 0 0.2em white;
+}
+
+.yt-item {
+    cursor: pointer;
+    user-select: none;
+    display:flex;
+    align-items:center;
+}
+
+.revert {
+    filter: invert(100%);
+}
+
+.yt-thumbnail {
+    width:120px; height:auto; margin-right:10px;
+    filter: invert(100%);
+}

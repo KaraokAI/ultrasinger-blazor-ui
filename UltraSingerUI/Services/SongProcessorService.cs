@@ -53,7 +53,7 @@ public class SongProcessorService(SongQueue songQueue)
         public static StringBuilder Stdout { get; set; } = new();
 
         public static StringBuilder Stderr { get; set; } = new();
-        
+
         private static EnvironmentalValuesService EnvironmentalValuesService { get; set; } = new();
         
         public static void Process(Song newSong)

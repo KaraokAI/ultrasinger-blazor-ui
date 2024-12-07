@@ -3,7 +3,7 @@
 <h3>
     Download Queue
 </h3>
-<div class="h-full">
+<div class="h-full overflow-y-scroll">
     <ol>
         @foreach ((var song, int i) in SongProcessorService.GetProcessedSongList().Select((x, i) => (x, i)))
         {
@@ -13,19 +13,19 @@
                     @switch (song.JobState)
                     {
                         case SongState.NOT_STARTED:
-                            <Text>⌛</Text>
+                            <Text>💤</Text>
                             break;
                         case SongState.COMPLETED:
                             <Text>✅</Text>
                             break;
                         case SongState.FAILED:
-                            <Text>☹</Text>
+                            <Text>😭</Text>
                             break;
                         case SongState.IN_PROGRESS:
                             <Text>🛠</Text>
                             break;
                         default:
-                            <Text>❓</Text>
+                            <Text>🤷</Text>
                             break;
                     }
                 </span>

@@ -1,5 +1,6 @@
 using Hangfire;
 using UltraSingerUI.Components;
+using UltraSingerUI.Configuration;
 using UltraSingerUI.Constants;
 using UltraSingerUI.Entities;
 using UltraSingerUI.Services;
@@ -22,10 +23,18 @@ builder.Services
         conf.WorkerCount = 1;
     });
 
+builder.Services.Configure<YouTubeAPIConfiguration>(opts =>
+{
+    opts.ApiKey = builder.Configuration["YT_API_KEY"];
+});
+
+EnvironmentalValuesService.Configuration = builder.Configuration;
+
 builder.Services
     .AddSingleton<SongQueue>()
     .AddScoped<SongProcessorService>()
-    .AddScoped<YoutubeMetadataService>();
+    .AddScoped<YoutubeMetadataService>()
+    .AddScoped<YouTubeAPIService>();
 
 var app = builder.Build();
 // Configure the HTTP request pipeline.

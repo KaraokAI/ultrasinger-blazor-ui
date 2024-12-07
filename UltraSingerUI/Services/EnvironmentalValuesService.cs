@@ -1,14 +1,20 @@
 using System.Collections;
+using Microsoft.Extensions.Options;
+using UltraSingerUI.Entities;
 
 namespace UltraSingerUI.Services;
 
-public class EnvironmentalValuesService()
+public class EnvironmentalValuesService
 {
-    public string UltraSingerPath => Environment.GetEnvironmentVariable("ULTRASINGER_PATH") ?? throw new InvalidOperationException("Required environment variable ULTRASINGER_PATH is not set.");
-    
-    public string UltraStarDeluxeLocalLibraryPath => Environment.GetEnvironmentVariable("ULTASTARDELUXE_LOCAL_LIBRARY_PATH") ?? throw new InvalidOperationException("Required environment variable ULTASTARDELUXE_LOCAL_LIBRARY_PATH is not set.");
+    public static IConfiguration Configuration { get; set; }
 
-    public string KaraokeLanguage => Environment.GetEnvironmentVariable("LANGUAGE") ?? "en";
+    private static UltraSingerConfiguration? ultraSingerConfiguration => Configuration.GetSection("ProcessorOptions").Get<UltraSingerConfiguration>();
+    
+    public string UltraSingerPath => ultraSingerConfiguration?.UltraSingerPath ?? throw new InvalidOperationException("Required environment variable ULTRASINGER_PATH is not set.");
+    
+    public string UltraStarDeluxeLocalLibraryPath => ultraSingerConfiguration?.UltraStarDeluxeLocalLibraryPath ?? throw new InvalidOperationException("Required environment variable ULTASTARDELUXE_LOCAL_LIBRARY_PATH is not set.");
+
+    public string KaraokeLanguage => ultraSingerConfiguration?.KaraokeLanguage ?? "en";
     
     /// <summary>
     /// ULTRASINGER_ADDITIONAL_VARIABLES needs to be in the form:
@@ -19,7 +25,7 @@ public class EnvironmentalValuesService()
     /// <returns></returns>
     public List<(string, string?)> GetUltraSingerAdditionalEnvironmentVariables()
     {
-        var environmentVarList = Environment.GetEnvironmentVariable("ULTRASINGER_ADDITIONAL_VARIABLES");
+        var environmentVarList = ultraSingerConfiguration?.UltraSingerAdditionalEnvVars;
         if (environmentVarList == null)
         {
             return new List<(string, string?)>();
@@ -28,9 +34,9 @@ public class EnvironmentalValuesService()
         return environmentVarList
             .Split(';')
             .Select(envKeypair => envKeypair.Split('='))
-            .Select(envKeypair => (envKeypair.First().Trim(), envKeypair.ElementAtOrDefault(2)))
+            .Select(envKeypair => (envKeypair.First().Trim(), envKeypair.ElementAtOrDefault(1)))
             .ToList();
     }
     
-    public string YTDLPPath => Environment.GetEnvironmentVariable("YTDLP_PATH") ?? throw new InvalidOperationException("Required environment variable YTDL_PATH is not set.");
+    public string YTDLPPath => ultraSingerConfiguration?.YTDLPPath ?? throw new InvalidOperationException("Required environment variable YTDL_PATH is not set.");
 }
