@@ -12,5 +12,7 @@ public record Song
 
     public string FriendlyName => Title ?? Url;
     
-    public DateTime CreatedAt => DateTime.Now;
+    public DateTime CreatedAt { get; private set; } = DateTime.Now;
+    
+    public DateTime? CompletedAt { get; set; }
 }

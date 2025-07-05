@@ -1,3 +1,5 @@
+                FileName = "pwsh",
+                Arguments = $"C:\\Users\\clott\\.pyenv\\pyenv-win\\bin\\pyenv.ps1 exec python UltraSinger.py -i {newSong.Url} -o 'F\\UltraStar Deluxe\\songs'",
 using System.Diagnostics;
 using System.Text;
 using Hangfire;
@@ -7,18 +9,12 @@ using UltraSingerUI.Entities;
 
 namespace UltraSingerUI.Services;
 
-public class SongProcessorService
+public class SongProcessorService(SongQueue songQueue)
 {
-    public SongProcessorService(SongQueue songQueue)
-    {
-        StorageApi = JobStorage.Current.GetConnection();
-        SongQueue = songQueue;
-    }
-    
-    private SongQueue SongQueue { get; set; }
-    
-    private IStorageConnection StorageApi { get; }
-    
+    private SongQueue SongQueue { get; set; } = songQueue;
+
+    private IStorageConnection StorageApi { get; } = JobStorage.Current.GetConnection();
+
     public void ProcessSong(Song newSong)
     {
         if (SongQueue.SongList.Any(x =>
@@ -59,6 +55,8 @@ public class SongProcessorService
         public static StringBuilder Stdout { get; set; } = new();
 
         public static StringBuilder Stderr { get; set; } = new();
+
+        private static EnvironmentalValuesService EnvironmentalValuesService { get; set; } = new();
         
         public static void Process(Song newSong)
         {
@@ -69,23 +67,47 @@ public class SongProcessorService
 
             process.StartInfo = new ProcessStartInfo
             {
-                FileName = "pwsh",
-                Arguments = $"C:\\Users\\clott\\.pyenv\\pyenv-win\\bin\\pyenv.ps1 exec python UltraSinger.py -i {newSong.Url} -o 'F\\UltraStar Deluxe\\songs'",
-                WorkingDirectory = "C:\\Users\\clott\\UltraSinger\\src\\",
+                FileName = "asdf",
+                // Arguments = $"exec python {EnvironmentalValuesService.UltraSingerPath}/src/UltraSinger.py -i {newSong.Url} -o \"/Users/sacredskull/UltraStar Deluxe Library\" --language {EnvironmentalValuesService.KaraokeLanguage}",
+                Arguments = $"exec python {EnvironmentalValuesService.UltraSingerPath}/src/UltraSinger.py -i {newSong.Url} -o \"{EnvironmentalValuesService.UltraStarDeluxeLocalLibraryPath}\" --language {EnvironmentalValuesService.KaraokeLanguage}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                Environment = { { "PYENV_VERSION", "3.10.11" } }
+                // Environment =
+                // {
+                //     { "PYENV_VERSION", "3.10.11" },
+                //     { "ASDF_PYTHON_VERSION", "3.10.11" },
+                //     { "PYTORCH_ENABLE_MPS_FALLBACK", "1" }
+                // }
             };
 
-            process.OutputDataReceived += (sender, args) => Stdout.Insert(0, args.Data + '\n');
-            process.ErrorDataReceived += (sender, args) => Stderr.Insert(0, args.Data + '\n');
+            foreach (var envVar in EnvironmentalValuesService.GetUltraSingerAdditionalEnvironmentVariables())
+            {
+                process.StartInfo.Environment.Add(envVar.Item1, envVar.Item2);
+            }
+
+            process.OutputDataReceived += (sender, args) =>
+            {
+                Stdout.Insert(0, args.Data + '\n');
+                Console.WriteLine(args.Data);
+            };
+            process.ErrorDataReceived += (sender, args) =>
+            {
+                Stdout.Insert(0, args.Data + '\n');
+                Stderr.Insert(0, args.Data + '\n');
+                Console.WriteLine(args.Data);
+            };
             
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             process.WaitForExit();
-
-            if (process.ExitCode == 0) return; 
+            
+            newSong.CompletedAt = DateTime.Now;
+            
+            if (process.ExitCode == 0)
+            {
+                return;
+            }
 
             throw new ApplicationException($"Failed to process URL: {Stderr}");
         }

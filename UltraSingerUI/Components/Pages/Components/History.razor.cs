@@ -40,6 +40,22 @@ public partial class History : ComponentBase, IDisposable
             SongProcessorService.UpdateSongState(song);
         }
     }
+
+    private string FormatDuration(Song song)
+    {
+        if (song.JobState == SongState.NOT_STARTED)
+        {
+            return string.Empty;
+        }
+        
+        if (song.CompletedAt == null && new[] { SongState.COMPLETED, SongState.FAILED }.Contains(song.JobState))
+        {
+            song.CompletedAt = DateTime.Now;
+        }
+        
+        var timespan = song.CreatedAt - (song.CompletedAt ?? DateTime.Now);
+        return $"({timespan.Negate():mm\\:ss})";
+    }
     
     public void Dispose()
     {

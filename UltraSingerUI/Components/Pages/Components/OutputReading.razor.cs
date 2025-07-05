@@ -9,7 +9,7 @@ public partial class OutputReading : ComponentBase, IDisposable
     [CascadingParameter]
     private SongProcessorService SongProcessorService { get; set; } = null!;
     
-    private Timer OutputRefreshInterval = new (TimeSpan.FromSeconds(1));
+    private Timer OutputRefreshInterval = new (TimeSpan.FromMilliseconds(100));
 
     private string OutputLog { get; set; } = string.Empty;
 

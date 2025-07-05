@@ -11,7 +11,7 @@ public partial class AddSong : ComponentBase
     private SongProcessorService SongProcessorService { get; set; } = null!;
     
     [Inject]
-    private YTDLPService YTDLPService { get; set; } = null!;
+    private YoutubeMetadataService YoutubeMetadataService { get; set; } = null!;
     
     private string? SongUrl { get; set; }
     
@@ -37,7 +37,7 @@ public partial class AddSong : ComponentBase
         SongProcessorService.ProcessSong(new Song
         {
             Url = SongUrl,
-            Title = await YTDLPService.GetTitleOfVideo(SongUrl),
+            Title = await YoutubeMetadataService.GetTitleOfVideo(SongUrl),
         });
 
         SongUrl = string.Empty;
