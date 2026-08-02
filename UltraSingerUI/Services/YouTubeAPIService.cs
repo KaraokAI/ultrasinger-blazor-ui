@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using UltraSingerUI.Configuration;
 using UltraSingerUI.Entities.Youtube;
+using UltraSingerUI.Exceptions;
 
 namespace UltraSingerUI.Services;
 
@@ -9,22 +10,42 @@ public class YouTubeAPIService(IOptions<YouTubeAPIConfiguration> ytCreds)
     private readonly HttpClient _httpClient = new();
     private const string ApiUrl = "https://www.googleapis.com/youtube/v3/search";
 
-    public async Task<List<YouTubeVideoResult>> SearchVideosAsync(string query)
+    public async Task<List<YouTubeVideoResult>> SearchVideosAsync(string query, bool tryBackup = false)
     {
-        var url = $"{ApiUrl}?part=snippet&type=video&q={Uri.EscapeDataString(query)}&maxResults=10&key={ytCreds.Value.ApiKey}";
+        var url = $"{ApiUrl}?part=snippet&type=video&q={Uri.EscapeDataString(query)}&maxResults=10&key={(tryBackup ? ytCreds.Value.BackupKey : ytCreds.Value.ApiKey)}";
+        
+        var rawResponse = await _httpClient.GetAsync(url);
 
-        var response = await _httpClient.GetFromJsonAsync<YouTubeSearchResponse>(url);
-        if (response?.Items == null) return new List<YouTubeVideoResult>();
+        if (rawResponse.IsSuccessStatusCode)
+        {
+            var response = await rawResponse.Content.ReadFromJsonAsync<YouTubeSearchResponse>();
+        
+            if (response?.Items == null) return new List<YouTubeVideoResult>();
 
-        return response.Items
-            .Where(item => item.Id?.VideoId != null)
-            .Select(item => new YouTubeVideoResult
+            return response.Items
+                .Where(item => item.Id?.VideoId != null)
+                .Select(item => new YouTubeVideoResult
+                {
+                    VideoId = item.Id.VideoId!,
+                    Title = item.Snippet.Title,
+                    ThumbnailUrl = item.Snippet.Thumbnails.Default.Url
+                })
+                .ToList();
+        }
+
+        var code = (int)rawResponse.StatusCode;
+        if (code > 400 && code < 500)
+        {
+            if (tryBackup)
             {
-                VideoId = item.Id.VideoId,
-                Title = item.Snippet.Title,
-                ThumbnailUrl = item.Snippet.Thumbnails.Default.Url
-            })
-            .ToList();
+                // We tried both the main and backup API key, but both failed.
+                throw new YoutubeRateLimitException();
+            }
+            
+            return await SearchVideosAsync(query, true);
+        }
+
+        return [];
     }
 
     // Classes for the deserialization
@@ -41,7 +62,7 @@ public class YouTubeAPIService(IOptions<YouTubeAPIConfiguration> ytCreds)
 
     private class YouTubeId
     {
-        public required string VideoId { get; set; }
+        public string? VideoId { get; set; }
     }
 
     private class YouTubeSnippet

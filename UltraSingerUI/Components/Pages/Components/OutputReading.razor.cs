@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
+using UltraSingerUI.Entities;
 using UltraSingerUI.Services;
 using Timer = System.Timers.Timer;
 
@@ -12,6 +14,8 @@ public partial class OutputReading : ComponentBase, IDisposable
     private Timer OutputRefreshInterval = new (TimeSpan.FromMilliseconds(100));
 
     private string OutputLog { get; set; } = string.Empty;
+    
+    private Song? CurrentSong { get; set; }
 
     protected override void OnAfterRender(bool firstRender)
     {
@@ -21,6 +25,8 @@ public partial class OutputReading : ComponentBase, IDisposable
         OutputRefreshInterval.Enabled = true;
         OutputRefreshInterval.Elapsed += (_, _) =>
         {
+            CurrentSong = SongProcessorService.GetProcessedSongList().LastOrDefault(x => x.JobState == SongState.IN_PROGRESS);
+            
             OutputLog = SongProcessorService.GetLatestLog();
             InvokeAsync(StateHasChanged);
         };

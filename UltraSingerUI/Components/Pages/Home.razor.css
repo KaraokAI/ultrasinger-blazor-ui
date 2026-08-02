@@ -3,8 +3,7 @@
 }
 
 .mic-backdrop {
-    background: url("ascii-art.png");
     background-size: contain;
-    background-repeat: no-repeat;
-    filter: invert();
+    background: url("ascii-art.png") no-repeat;
+    filter: invert() opacity(0.75);
 }

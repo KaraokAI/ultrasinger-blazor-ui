@@ -4,11 +4,14 @@
     Download Queue
 </h3>
 <div class="h-full overflow-y-scroll">
+    @{
+        var songList = SongProcessorService.GetProcessedSongList().ToList();
+    }
     <ol>
-        @foreach ((var song, int i) in SongProcessorService.GetProcessedSongList().Select((x, i) => (x, i)))
+        @foreach ((var song, int i) in songList.Select((x, i) => (x, i)))
         {
             <li>
-                @(i + 1). <a class="underline" href="@song.Url">@(song.FriendlyName)</a>
+                @(songList.Count - i). <a class="underline" href="@song.Url">@(song.FriendlyName)</a>
                 <span class="px-1">
                     @switch (song.JobState)
                     {
@@ -29,7 +32,7 @@
                             break;
                     }
                 </span>
-                <span>@(FormatDuration(song))</span>
+                <span>@song.WallClockTimeHuman()</span>
             </li>
         }
     </ol>

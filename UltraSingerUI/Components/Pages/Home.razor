@@ -2,22 +2,21 @@
 @using UltraSingerUI.Components.Pages.Components
 
 <CascadingValue Value="SongProcessorService">
-    <div class="flex flex-col dark w-full h-full mic-backdrop">
-        <div class="flex flex-col h-1/3 w-full">
-            <div class="flex flex-row h-full">
-                <div class="md:w-1/2 w-full text-lg h-full">
-                    <div class="flex flex-col">
-                        <History/>
-                    </div>
-                </div>
-                <div class="output md:w-1/2 w-full hidden md:block shadow-md rounded-md px-6 bg-gray-900 text-white overflow-auto">
-                    <OutputReading/>
-                </div>
+    <div class="flex dark w-full mic-backdrop">
+        <div class="flex flex-col w-3/5 h-full">
+            <div class="w-full h-2/5 text-lg">
+                <History/>
+            </div>
+            <div class="w-full mt-7 h-3/5">
+                <YouTubeSearch/>
             </div>
         </div>
-        <div class="flex flex-col w-full h-2/3">
-            @* <AddSong /> *@
-            <YouTubeSearch />
+        <div class="w-2/5 h-full relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent via-transparent to-white pointer-events-none">
+            </div>
+            <div class="m-3 wrap-break-word h-full overflow-y-scroll">
+                <OutputReading/>
+            </div>
         </div>
     </div>
 </CascadingValue>

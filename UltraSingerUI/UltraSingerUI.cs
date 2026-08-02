@@ -26,6 +26,7 @@ builder.Services
 builder.Services.Configure<YouTubeAPIConfiguration>(opts =>
 {
     opts.ApiKey = builder.Configuration["YT_API_KEY"];
+    opts.BackupKey = builder.Configuration["YT_API_KEY_BACKUP"];
 });
 
 EnvironmentalValuesService.Configuration = builder.Configuration;

@@ -17,3 +17,11 @@
     width:120px; height:auto; margin-right:10px;
     filter: invert(100%);
 }
+
+.yt-blur::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(14px);
+}

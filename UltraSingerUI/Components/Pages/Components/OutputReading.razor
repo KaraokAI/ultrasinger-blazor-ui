@@ -1,5 +1,20 @@
-<pre>
-<code>
-@OutputLog
-</code>
-</pre>
+<div class="text-red mb-3">
+    @if (CurrentSong != null)
+    {
+        <text>
+            🛠 Currently working on: <i class="text-lime-950">@CurrentSong.FriendlyName</i>
+            <br />
+            <i class="text-sm">It's been running for <b class="text-lime-950">@CurrentSong.WallClockTimeHuman()</b> if you were curious</i>
+        </text>
+    }
+    else
+    {
+        <text>
+            &nbsp;Eagerly awaiting your next song to be queued 🙇‍♂️
+        </text>
+    }
+</div>
+
+<div class="whitespace-pre-line font-mono text-sm text-lime-950">
+    @OutputLog
+</div>
