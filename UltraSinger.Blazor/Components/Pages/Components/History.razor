@@ -1,0 +1,36 @@
+@using UltraSinger.Contracts
+
+<h3>
+    Download Queue
+</h3>
+<div class="h-full overflow-y-scroll">
+    <ol>
+        @foreach ((var song, int i) in Songs.Select((x, i) => (x, i)))
+        {
+            <li>
+                @(Songs.Count - i). <a class="underline" href="@song.Url">@(song.FriendlyName)</a>
+                <span class="px-1">
+                    @switch (song.State)
+                    {
+                        case SongState.NOT_STARTED:
+                            <Text>💤</Text>
+                            break;
+                        case SongState.COMPLETED:
+                            <Text>✅</Text>
+                            break;
+                        case SongState.FAILED:
+                            <Text>😭</Text>
+                            break;
+                        case SongState.IN_PROGRESS:
+                            <Text>🛠</Text>
+                            break;
+                        default:
+                            <Text>🤷</Text>
+                            break;
+                    }
+                </span>
+                <span>@song.WallClockTimeHuman()</span>
+            </li>
+        }
+    </ol>
+</div>

@@ -349,3 +349,6 @@ healthchecksdb
 MigrationBackup/
 
 .DS_Store
+
+**/hangfire.db*
+**/songs.db*

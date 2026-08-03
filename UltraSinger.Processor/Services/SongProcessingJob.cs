@@ -1,0 +1,289 @@
+using System.Diagnostics;
+using System.IO.Compression;
+using System.Text;
+using System.Text.RegularExpressions;
+using UltraSinger.Contracts;
+using UltraSinger.Processor.Entities;
+
+namespace UltraSinger.Processor.Services;
+
+/// <summary>
+/// Where a single job's raw UltraSinger output lives, nested under the existing WSL/local
+/// root pair rather than a separate temp filesystem — no new path translation is needed, and
+/// because the directory belongs to exactly one job, everything under it is by definition
+/// "the new files" for that job.
+/// </summary>
+public readonly record struct JobDirectories(string LocalPath, string WslPath);
+
+/// <summary>
+/// Runs UltraSinger for a single song. Replaces the old static
+/// <c>SongProcessorService.InternalWorker</c>: it is resolved from DI and enqueued by song
+/// id, so everything it writes lands on the shared <see cref="ISongStore"/> record rather
+/// than on a Hangfire-deserialised copy of the song that nobody else can see.
+/// </summary>
+public class SongProcessingJob(
+    ISongStore store,
+    EnvironmentalValuesService environmentalValues,
+    SyncedLyricsService lyricsService,
+    OpenAIImproverService openAIImproverService,
+    ILogger<SongProcessingJob> logger)
+{
+    private const string OutputLeadingText = "Parse ultrastar txt -> ";
+
+    private static readonly Regex AnsiColourCodeRegex = new(@"\[[0-9]{1,2}m", RegexOptions.Compiled);
+
+    public async Task ProcessAsync(Guid songId)
+    {
+        var song = store.Get(songId);
+
+        if (song == null)
+        {
+            // The record went away (processor restarted, or it was deleted). Nothing to do.
+            logger.LogWarning("Job started for unknown song {SongId}; skipping.", songId);
+            return;
+        }
+
+        song.State = SongState.IN_PROGRESS;
+        song.BeganProcessingAt = DateTime.Now;
+
+        var jobDirectories = new JobDirectories(
+            LocalPath: Path.Combine(environmentalValues.UltraStarDeluxeLocalLibraryPath, "..", "_jobs", song.Id.ToString("N")),
+            WslPath: $"{environmentalValues.UltraStarDeluxeWSLPath.TrimEnd('/')}/../_jobs/{song.Id:N}");
+
+        try
+        {
+            await RunUltraSingerAsync(song, jobDirectories);
+
+            try
+            {
+                // Attempt OpenAI-based improvement of UltraStar file
+                await TryImproveUltraStarWithOpenAI(song, jobDirectories);
+            }
+            catch (Exception ex)
+            {
+                // Do not fail the job if post-processing fails; just log it.
+                var msg = $"[UltraSinger][PostProcess] Improvement step failed: {ex.Message}";
+                song.AppendLog(msg);
+                logger.LogError(ex, "Post-processing failed for {SongId}", songId);
+            }
+
+            // Unlike the OpenAI step above, bundling is the actual deliverable — a failure
+            // here must fail the job rather than leave a bundle-less "COMPLETED" song.
+            await BundleSongAsync(song, jobDirectories);
+
+            song.State = SongState.COMPLETED;
+        }
+        catch
+        {
+            song.State = SongState.FAILED;
+            throw;
+        }
+        finally
+        {
+            // Stamped once the job is genuinely finished, post-processing included, which is
+            // what the wall clock in the UI has always effectively shown.
+            song.CompletedAt = DateTime.Now;
+        }
+    }
+
+    private async Task RunUltraSingerAsync(SongRecord song, JobDirectories jobDirectories)
+    {
+        Directory.CreateDirectory(jobDirectories.LocalPath);
+
+        var process = new Process();
+        var fileName = environmentalValues.PythonExecutable;
+
+        var ultraStarDeluxePath = SanitisePath($"{environmentalValues.UltraSingerPath.TrimEnd('/', '\\')}/src/UltraSinger.py");
+        var wslOutputPath = SanitisePath(jobDirectories.WslPath);
+
+        var arguments = $"""{environmentalValues.PythonArguments} {ultraStarDeluxePath} -i {song.Url} -o {wslOutputPath} --language "{environmentalValues.KaraokeLanguage}" {environmentalValues.UltraSingerAdditionalArgs}""";
+
+        logger.LogInformation("Using argument: {FileName} {Arguments}", fileName, arguments);
+
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        foreach (var (key, value) in environmentalValues.GetUltraSingerAdditionalEnvironmentVariables())
+        {
+            process.StartInfo.Environment[key] = value;
+        }
+
+        process.OutputDataReceived += (_, args) =>
+        {
+            ParseOutput(song, jobDirectories, args.Data, isError: false);
+            logger.LogInformation("{Line}", args.Data);
+        };
+        process.ErrorDataReceived += (_, args) =>
+        {
+            ParseOutput(song, jobDirectories, args.Data, isError: true);
+            logger.LogInformation("{Line}", args.Data);
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            throw new ApplicationException($"Failed to process URL: {song.ErrorText}");
+        }
+    }
+
+    /// <summary>
+    /// Filters raw process output down to the <c>[UltraSinger]</c> lines worth showing, and
+    /// picks the produced .txt path out of the "Parse ultrastar txt -> " line.
+    /// </summary>
+    private void ParseOutput(SongRecord song, JobDirectories jobDirectories, string? source, bool isError)
+    {
+        if (source == null)
+        {
+            return;
+        }
+
+        source = AnsiColourCodeRegex.Replace(source, "");
+
+        if (source.Contains("[UltraSinger]"))
+        {
+            if (isError)
+            {
+                song.AppendError(source);
+            }
+            else
+            {
+                song.AppendLog(source);
+            }
+        }
+
+        if (!source.Contains(OutputLeadingText))
+        {
+            return;
+        }
+
+        var rootPathIndex = source.IndexOf(jobDirectories.WslPath, StringComparison.Ordinal);
+
+        if (rootPathIndex == -1)
+        {
+            return;
+        }
+
+        var relativePathIndex = jobDirectories.WslPath.Length + rootPathIndex;
+        song.UltraStarTxtPath = source[relativePathIndex..].TrimStart('/');
+    }
+
+    private async Task TryImproveUltraStarWithOpenAI(SongRecord song, JobDirectories jobDirectories)
+    {
+        if (!environmentalValues.EnableOpenAICorrections)
+        {
+            song.AppendLog("[UltraSinger][PostProcess] OpenAI corrections disabled by configuration. Skipping.");
+            return;
+        }
+
+        logger.LogInformation("[UltraSinger][PostProcess] Attempting AI-based lyric improvement.");
+
+        if (string.IsNullOrWhiteSpace(song.UltraStarTxtPath))
+        {
+            song.AppendLog("[UltraSinger][PostProcess] UltraStar txt path not found in output. Skipping improvement.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(environmentalValues.OpenAIKey))
+        {
+            song.AppendLog("[UltraSinger][PostProcess] OpenAI API key not configured. Skipping.");
+            return;
+        }
+
+        var localRoot = jobDirectories.LocalPath.TrimEnd('\\', '/');
+        var relative = song.UltraStarTxtPath!.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
+        var fullPath = Path.Combine(localRoot, relative);
+
+        if (!File.Exists(fullPath))
+        {
+            song.AppendLog($"[UltraSinger][PostProcess] UltraStar file not found at expected location: {fullPath}");
+            return;
+        }
+
+        var originalTxt = await File.ReadAllTextAsync(fullPath);
+
+        // Fetch lyrics using title. The service handles conditioning, so what comes back is
+        // ready to hand to the model.
+        var title = song.Title ?? song.Url;
+        var lyrics = await lyricsService.TryGetLyricsAsync(title);
+
+        if (lyrics is null)
+        {
+            var noLyrics = $"[UltraSinger][PostProcess] Could not fetch lyrics for '{title}'. Skipping improvement.";
+            song.AppendLog(noLyrics);
+            song.AppendError(noLyrics);
+            logger.LogWarning("{Message}", noLyrics);
+            return;
+        }
+
+        song.AppendLog($"[UltraSinger][PostProcess] Fetched {(lyrics.IsSynced ? "time-synced" : "plain")} lyrics for '{title}'.");
+
+        var improved = await openAIImproverService.ImproveUltraStarAsync(originalTxt, lyrics, title);
+
+        if (string.IsNullOrWhiteSpace(improved))
+        {
+            const string noResponse = "[UltraSinger][PostProcess] OpenAI returned no content. Skipping write.";
+            song.AppendLog(noResponse);
+            song.AppendError(noResponse);
+            logger.LogWarning("{Message}", noResponse);
+            return;
+        }
+        
+        var dir = Path.GetDirectoryName(fullPath)!;
+        var name = Path.GetFileNameWithoutExtension(fullPath);
+        var ext = Path.GetExtension(fullPath);
+        string targetPath = Path.Combine(dir, name + "-improved" + ext);
+        
+        await File.WriteAllTextAsync(targetPath, improved, Encoding.UTF8);
+        var msg = $"[UltraSinger][PostProcess] Wrote improved UltraStar file: {targetPath}";
+        song.AppendLog(msg);
+        song.AppendError(msg);
+        logger.LogInformation("{Message}", msg);
+    }
+
+    /// <summary>
+    /// Zips the job's per-job output directory (no compression — audio/video are already
+    /// compressed) into <see cref="EnvironmentalValuesService.BundleStoragePath"/>, then
+    /// deletes the raw directory. The zip becomes the artifact of record; unlike the OpenAI
+    /// step, a failure here is rethrown so the job ends up <see cref="SongState.FAILED"/>
+    /// rather than "completed" with nothing for the UI to fetch.
+    /// </summary>
+    private Task BundleSongAsync(SongRecord song, JobDirectories jobDirectories)
+    {
+        if (!Directory.Exists(jobDirectories.LocalPath))
+        {
+            throw new ApplicationException($"No output directory found to bundle at {jobDirectories.LocalPath}.");
+        }
+
+        Directory.CreateDirectory(environmentalValues.BundleStoragePath);
+
+        var zipPath = Path.Combine(environmentalValues.BundleStoragePath, $"{song.Id:N}.zip");
+
+        if (File.Exists(zipPath))
+        {
+            File.Delete(zipPath);
+        }
+
+        ZipFile.CreateFromDirectory(jobDirectories.LocalPath, zipPath, CompressionLevel.NoCompression, includeBaseDirectory: false);
+
+        song.BundlePath = zipPath;
+
+        Directory.Delete(jobDirectories.LocalPath, recursive: true);
+
+        var msg = $"[UltraSinger][Bundle] Bundled output into {zipPath}";
+        song.AppendLog(msg);
+        logger.LogInformation("{Message}", msg);
+
+        return Task.CompletedTask;
+    }
+
+    public static string SanitisePath(string source) => source.Replace(" ", "\\ ");
+}

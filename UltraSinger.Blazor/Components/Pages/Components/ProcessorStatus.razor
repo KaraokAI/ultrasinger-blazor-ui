@@ -1,0 +1,12 @@
+@if (!ConnectionState.IsReachable)
+{
+    <div class="processor-banner">
+        🔌 Can't reach the processor@(string.IsNullOrWhiteSpace(Error) ? "." : $": {Error}")
+    </div>
+}
+else if (Health is { Healthy: false })
+{
+    <div class="processor-banner processor-banner-warn">
+        ⚠️ Processor is misconfigured: @string.Join(" ", Health.Problems)
+    </div>
+}
