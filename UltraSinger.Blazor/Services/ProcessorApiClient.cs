@@ -25,13 +25,31 @@ public class ProcessorApiClient(
     ProcessorConnectionState connectionState,
     ILogger<ProcessorApiClient> logger)
 {
-    public async Task<EnqueueResult> EnqueueAsync(string url, string? title = null, CancellationToken cancellationToken = default)
+    public async Task<EnqueueResult> EnqueueAsync(
+        string url,
+        string? title = null,
+        SongSource source = SongSource.YouTube,
+        int? usdbSongId = null,
+        string? ultraStarTxt = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await EnqueueAsync(new EnqueueSongRequest
+        {
+            Url = url,
+            Title = title,
+            Source = source,
+            UsdbSongId = usdbSongId,
+            UltraStarTxt = ultraStarTxt
+        }, cancellationToken);
+    }
+
+    public async Task<EnqueueResult> EnqueueAsync(EnqueueSongRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
             var response = await http.PostAsJsonAsync(
                 "api/songs",
-                new EnqueueSongRequest { Url = url, Title = title },
+                request,
                 cancellationToken);
 
             connectionState.MarkReachable();
@@ -43,7 +61,7 @@ public class ProcessorApiClient(
 
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Enqueue of {Url} failed with {StatusCode}", url, response.StatusCode);
+                logger.LogWarning("Enqueue of {Url} failed with {StatusCode}", request.Url, response.StatusCode);
                 connectionState.MarkUnreachable($"Processor rejected the request ({(int)response.StatusCode}).");
                 return EnqueueResult.Failed;
             }

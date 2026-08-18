@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UltraSinger.Contracts", "Ul
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UltraSinger.Processor", "UltraSinger.Processor\UltraSinger.Processor.csproj", "{8A7B93F2-1D30-4DD9-89CB-C3DAD912C16F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UltraSinger.Tests", "UltraSinger.Tests\UltraSinger.Tests.csproj", "{93117CB7-DC3B-4448-AA35-167E773CBE66}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,18 @@ Global
 		{8A7B93F2-1D30-4DD9-89CB-C3DAD912C16F}.Release|x64.Build.0 = Release|Any CPU
 		{8A7B93F2-1D30-4DD9-89CB-C3DAD912C16F}.Release|x86.ActiveCfg = Release|Any CPU
 		{8A7B93F2-1D30-4DD9-89CB-C3DAD912C16F}.Release|x86.Build.0 = Release|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Debug|x64.Build.0 = Debug|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Debug|x86.Build.0 = Debug|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Release|x64.ActiveCfg = Release|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Release|x64.Build.0 = Release|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Release|x86.ActiveCfg = Release|Any CPU
+		{93117CB7-DC3B-4448-AA35-167E773CBE66}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

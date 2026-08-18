@@ -1,3 +1,4 @@
+using UltraSinger.Contracts;
 using UltraSinger.Processor.Entities;
 
 namespace UltraSinger.Processor.Services;
@@ -8,7 +9,7 @@ namespace UltraSinger.Processor.Services;
 public interface ISongStore
 {
     /// <summary>Creates a record and returns it. The id is assigned here, before the job is enqueued.</summary>
-    SongRecord Add(string url, string? title);
+    SongRecord Add(string url, string? title, SongSource source = SongSource.YouTube, int? usdbSongId = null, string? ultraStarTxt = null);
 
     SongRecord? Get(Guid id);
 

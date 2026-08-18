@@ -9,4 +9,10 @@ public record EnqueueSongRequest
     public required string Url { get; init; }
 
     public string? Title { get; init; }
+
+    public SongSource Source { get; init; } = SongSource.YouTube;
+
+    public int? UsdbSongId { get; init; }
+
+    public string? UltraStarTxt { get; init; }
 }

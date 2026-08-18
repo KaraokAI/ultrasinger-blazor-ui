@@ -1,23 +1,121 @@
 @using System.Web
+@using UltraSinger.Contracts
 @{
     var showingResults = !string.IsNullOrEmpty(SearchQuery) && Results is { Count: 0 };
 }
 
-<div class=@($"flex-grow flex flex-col h-full")>
-    <div class="flex-grow overflow-y-scroll">
+<div class="flex-grow flex flex-col h-full">
+    @if (!string.IsNullOrEmpty(FeedbackMessage))
+    {
+        <div class="mb-2 p-2 bg-slate-800 text-slate-100 rounded text-sm border border-slate-600">
+            @FeedbackMessage
+        </div>
+    }
+
+    <div class="flex-grow overflow-y-scroll space-y-2 pr-2">
         @if (IsLoading)
         {
-            <p>Loading...</p>
+            <div class="flex items-center space-x-2 text-slate-300 p-3">
+                <span class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
+                <span>Searching Local Library, USDB, and YouTube...</span>
+            </div>
         }
         else if (Results is { Count: > 0 })
         {
-            <div class="list-group">
-                @foreach (var video in Results)
+            <div class="space-y-2">
+                @foreach (var result in Results)
                 {
-                    <div class="list-group-item list-group-item-action yt-item" style="" @onclick="() => OnSelectVideo(video)">
-                        <img class="revert yt-thumbnail" src="@video.ThumbnailUrl" alt="thumbnail" />
-                        <div>
-                            <strong class="yt-title">@HttpUtility.HtmlDecode(video.Title)</strong><br />
+                    <div class="flex items-center justify-between p-3 rounded-lg border border-slate-700 bg-slate-900/80 hover:bg-slate-800/90 transition">
+                        <div class="flex items-center space-x-3 overflow-hidden flex-grow mr-2">
+                            @if (!string.IsNullOrWhiteSpace(result.ThumbnailUrl))
+                            {
+                                <img class="w-16 h-12 object-cover rounded shadow" src="@result.ThumbnailUrl" alt="thumbnail" />
+                            }
+                            <div class="overflow-hidden">
+                                <div class="flex items-center space-x-2">
+                                    @if (result.Source == SongSource.Local)
+                                    {
+                                        <span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 text-emerald-100">LOCAL</span>
+                                    }
+                                    else if (result.Source == SongSource.USDB)
+                                    {
+                                        <span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-700 text-blue-100">USDB</span>
+                                        @if (result.HasGoldenNotes)
+                                        {
+                                            <span class="px-1.5 py-0.5 text-xs font-bold rounded bg-amber-600 text-amber-100" title="Golden Notes">★ Gold</span>
+                                        }
+                                        @if (result.Rating.HasValue && result.Rating > 0)
+                                        {
+                                            <span class="text-xs text-yellow-400">★ @result.Rating.Value.ToString("0.#")</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="px-2 py-0.5 text-xs font-bold rounded bg-red-700 text-red-100">YouTube</span>
+                                    }
+
+                                    <strong class="text-slate-100 truncate">
+                                        @HttpUtility.HtmlDecode(result.DisplayTitle)
+                                    </strong>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(result.ExtraInfo))
+                                {
+                                    <div class="text-xs text-slate-400 mt-0.5 truncate">
+                                        @result.ExtraInfo
+                                    </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(result.Description))
+                                {
+                                    <div class="text-xs text-slate-400 mt-0.5 truncate">
+                                        @result.Description
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="flex-shrink-0 flex items-center gap-2">
+                            @if (result.Source == SongSource.Local)
+                            {
+                                <span class="px-2.5 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/60 rounded-full border border-emerald-800">
+                                    In Library
+                                </span>
+                                <button @onclick="() => OnQueueInGame(result)"
+                                        disabled="@(QueuingSongTitle == result.DisplayTitle)"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white transition flex items-center gap-1 shadow-sm">
+                                    @if (QueuingSongTitle == result.DisplayTitle)
+                                    {
+                                        <span class="animate-spin">⏳</span>
+                                        <span>Queuing...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>🎮</span>
+                                        <span>Queue</span>
+                                    }
+                                </button>
+                            }
+                            else if (result.Source == SongSource.USDB)
+                            {
+                                @if (ProcessingSongId == result.UsdbSongId)
+                                {
+                                    <button disabled class="px-3 py-1.5 text-xs font-semibold rounded bg-blue-900 text-blue-300 opacity-60">
+                                        Queuing...
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button @onclick="() => OnSelectResult(result)" class="px-3 py-1.5 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white transition">
+                                        Download
+                                    </button>
+                                }
+                            }
+                            else
+                            {
+                                <button @onclick="() => OnSelectResult(result)" class="px-3 py-1.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-500 text-white transition">
+                                    Process
+                                </button>
+                            }
                         </div>
                     </div>
                 }
@@ -25,30 +123,23 @@
         }
         else if (showingResults && !HasQueued)
         {
-            <p>No results found.</p>
+            <p class="text-slate-400 p-3">No results found across Local Library, USDB, or YouTube.</p>
         }
     </div>
 
     @if (!IsRateLimited)
     {
-        <form class="my-3 flex w-full gap-3 text-lime-950" @onsubmit="@PerformSearch">
-            <input @bind="SearchQuery" class="form-control flex-grow w-full border p-3 shadow-md" placeholder="Search for a video..."/>
-            <a href="#" @onclick="@PerformSearch" class="@($" relative inline-block text-lg group {(string.IsNullOrEmpty(SearchQuery) ? "pointer-events-none cursor-not-allowed" : "")}")">
-                <span class="relative z-10 block px-5 py-3 overflow-hidden font-medium leading-tight transition-colors duration-300 ease-out border-2 border-gray-900 rounded-lg group-hover:text-white">
-                    <span class="w-full absolute inset-0 w-full h-full px-5 py-3 rounded-lg bg-gray-50"></span>
-                    <span class="w-full absolute left-0 w-48 h-48 -ml-2 transition-all duration-300 origin-top-right -rotate-90 -translate-x-full translate-y-12 bg-gray-900 group-hover:-rotate-180 ease"></span>
-                    <span class="w-full relative">Search</span>
-                </span>
-                <span class="absolute bottom-0 right-0 w-full h-12 -mb-1 -mr-1 transition-all duration-200 ease-linear bg-gray-900 rounded-lg group-hover:mb-0 group-hover:mr-0" data-rounded="rounded-lg"></span>
-            </a>
+        <form class="my-3 flex w-full gap-3 text-slate-900" @onsubmit="@PerformSearch">
+            <input @bind="SearchQuery" class="form-control flex-grow w-full border p-3 rounded shadow-md bg-slate-100" placeholder="Search local library, USDB, or YouTube..."/>
+            <button type="submit" class="px-6 py-3 font-semibold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition shadow @(string.IsNullOrWhiteSpace(SearchQuery) ? "opacity-50 cursor-not-allowed" : "")">
+                Search
+            </button>
         </form>   
     }
     else
     {
-        <p class="text-lg p-3">
-            ⏳ The YouTube gods are angry at our transgressions... please wait @(RateLimitTimer.Interval/1000) 🙏 
+        <p class="text-lg p-3 text-amber-300">
+            ⏳ The YouTube gods are angry at our transgressions... please wait @(RateLimitTimer.Interval/1000)s 🙏 
         </p>
     }
 </div>
-
-

@@ -1,5 +1,5 @@
 <div class="@($"flex flex-row items-center py-2 w-full {(!IsAdding ? "" : "pointer-events-none cursor-not-allowed invisible")}")">
-    <InputText @onchange="@StateHasChanged" class="@("w-full border p-3 shadow-md")" @bind-Value="SongUrl" placeholder="➕ Enter YouTube URL here..."/>
+    <InputText @onchange="@StateHasChanged" class="@("w-full border p-3 shadow-md")" @bind-Value="SongUrl" placeholder="➕ Enter YouTube URL or USDB URL / ID here..."/>
 </div>
 <a href="#" @onclick="@AddToQueue" class="@($" relative inline-block text-lg group {(EnableAddButton ? "" : "pointer-events-none cursor-not-allowed invisible")}")">
             <span class="relative z-10 block px-5 py-3 overflow-hidden font-medium leading-tight text-gray-800 transition-colors duration-300 ease-out border-2 border-gray-900 rounded-lg group-hover:text-white">

@@ -52,13 +52,16 @@ public class SqliteSongStore(SongDatabase database, ILogger<SqliteSongStore> log
     /// <summary>Records with unsaved changes. Used by the flusher.</summary>
     public IReadOnlyList<SongRecord> GetDirty() => _songs.Values.Where(x => x.IsDirty).ToList();
 
-    public SongRecord Add(string url, string? title)
+    public SongRecord Add(string url, string? title, SongSource source = SongSource.YouTube, int? usdbSongId = null, string? ultraStarTxt = null)
     {
         var record = new SongRecord
         {
             Id = Guid.NewGuid(),
             Url = url,
-            Title = title
+            Title = title,
+            Source = source,
+            UsdbSongId = usdbSongId,
+            UltraStarTxt = ultraStarTxt
         };
 
         _songs[record.Id] = record;

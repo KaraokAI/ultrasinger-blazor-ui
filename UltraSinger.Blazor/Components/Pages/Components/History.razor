@@ -1,36 +1,93 @@
 @using UltraSinger.Contracts
 
-<h3>
-    Download Queue
-</h3>
-<div class="h-full overflow-y-scroll">
-    <ol>
-        @foreach ((var song, int i) in Songs.Select((x, i) => (x, i)))
+<div class="flex flex-col h-full">
+    <div class="flex items-center justify-between mb-2">
+        <h3 class="text-base font-bold text-slate-200">
+            📥 Processing & Download Queue (@Songs.Count)
+        </h3>
+    </div>
+
+    @if (!string.IsNullOrEmpty(FeedbackMessage))
+    {
+        <div class="mb-2 p-2 rounded text-xs @(IsFeedbackError ? "bg-red-950/80 text-red-200 border border-red-800" : "bg-emerald-950/80 text-emerald-200 border border-emerald-800")">
+            @FeedbackMessage
+        </div>
+    }
+
+    <div class="flex-grow overflow-y-auto space-y-2 pr-1">
+        @if (Songs.Count == 0)
         {
-            <li>
-                @(Songs.Count - i). <a class="underline" href="@song.Url">@(song.FriendlyName)</a>
-                <span class="px-1">
-                    @switch (song.State)
-                    {
-                        case SongState.NOT_STARTED:
-                            <Text>💤</Text>
-                            break;
-                        case SongState.COMPLETED:
-                            <Text>✅</Text>
-                            break;
-                        case SongState.FAILED:
-                            <Text>😭</Text>
-                            break;
-                        case SongState.IN_PROGRESS:
-                            <Text>🛠</Text>
-                            break;
-                        default:
-                            <Text>🤷</Text>
-                            break;
-                    }
-                </span>
-                <span>@song.WallClockTimeHuman()</span>
-            </li>
+            <div class="p-6 text-center text-slate-400 text-sm">
+                No active or completed downloads yet.
+            </div>
         }
-    </ol>
+        else
+        {
+            <ol class="space-y-2">
+                @foreach ((var song, int i) in Songs.Select((x, i) => (x, i)))
+                {
+                    <li class="flex items-center justify-between p-2.5 rounded-lg border border-slate-700 bg-slate-900/70 hover:bg-slate-800/70 transition text-sm">
+                        <div class="flex items-center space-x-2 overflow-hidden mr-2">
+                            <span class="text-xs text-slate-500 font-mono w-5">@(Songs.Count - i).</span>
+                            <span class="px-1 text-base">
+                                @switch (song.State)
+                                {
+                                    case SongState.NOT_STARTED:
+                                        <span title="Waiting to start">💤</span>
+                                        break;
+                                    case SongState.COMPLETED:
+                                        <span title="Completed">✅</span>
+                                        break;
+                                    case SongState.FAILED:
+                                        <span title="Failed">😭</span>
+                                        break;
+                                    case SongState.IN_PROGRESS:
+                                        <span title="Processing" class="animate-spin inline-block">⚙️</span>
+                                        break;
+                                    default:
+                                        <span title="Unknown">🤷</span>
+                                        break;
+                                }
+                            </span>
+
+                            @if (song.Source == SongSource.USDB)
+                            {
+                                <span class="px-1.5 py-0.2 text-[10px] font-bold rounded bg-blue-800 text-blue-100">USDB</span>
+                            }
+                            else
+                            {
+                                <span class="px-1.5 py-0.2 text-[10px] font-bold rounded bg-red-800 text-red-100">YT</span>
+                            }
+
+                            <div class="overflow-hidden">
+                                <a class="underline text-indigo-300 hover:text-indigo-200 font-medium truncate block" href="@song.Url" target="_blank" rel="noopener noreferrer">
+                                    @(song.FriendlyName)
+                                </a>
+                                <span class="text-[11px] text-slate-400">@song.WallClockTimeHuman()</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            @if (song.State == SongState.COMPLETED)
+                            {
+                                <button @onclick="() => QueueInGameAsync(song)"
+                                        disabled="@(QueuingSongId == song.Id)"
+                                        class="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-800/80 hover:bg-emerald-700 disabled:opacity-50 text-emerald-100 border border-emerald-700 transition flex items-center gap-1 shadow-sm">
+                                    @if (QueuingSongId == song.Id)
+                                    {
+                                        <span class="animate-spin">⏳</span>
+                                        <span>Queuing...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>🎮 Queue</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </div>
 </div>

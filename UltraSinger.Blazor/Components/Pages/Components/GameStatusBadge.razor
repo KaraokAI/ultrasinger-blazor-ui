@@ -1,0 +1,98 @@
+@using UltraSinger.Blazor.Services
+@using UltraSinger.Contracts
+@inject IUltraStarPlayService UltraStarPlayService
+@implements IAsyncDisposable
+
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border @BadgeClass cursor-pointer"
+     title="@TooltipText"
+     @onclick="TriggerCheck">
+    <span class="inline-block w-2 h-2 rounded-full @DotClass"></span>
+    <span class="font-medium hidden sm:inline">UltraStar Play</span>
+    <span class="text-slate-400">(@StatusText)</span>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    private UltraStarPlayStatus Status { get; set; } = new();
+    private bool IsLoading { get; set; } = true;
+    private readonly CancellationTokenSource _cts = new();
+    private Task? _pollTask;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        _pollTask = StartPollingAsync();
+    }
+
+    private async Task StartPollingAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            do
+            {
+                await CheckStatusAsync();
+            } while (await timer.WaitForNextTickAsync(_cts.Token));
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+    }
+
+    private async Task CheckStatusAsync()
+    {
+        try
+        {
+            Status = await UltraStarPlayService.CheckConnectionAsync(_cts.Token);
+        }
+        catch
+        {
+            Status.IsConnected = false;
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task TriggerCheck()
+    {
+        IsLoading = true;
+        await CheckStatusAsync();
+        if (OnClick.HasDelegate)
+        {
+            await OnClick.InvokeAsync();
+        }
+    }
+
+    private string BadgeClass => Status.IsConnected
+        ? "bg-emerald-950/80 text-emerald-200 border-emerald-800 hover:bg-emerald-900"
+        : "bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800";
+
+    private string DotClass => Status.IsConnected
+        ? "bg-emerald-400"
+        : (IsLoading ? "bg-amber-400 animate-pulse" : "bg-slate-500");
+
+    private string StatusText => Status.IsConnected
+        ? $"{Status.HttpPort}"
+        : (IsLoading ? "..." : "offline");
+
+    private string TooltipText => Status.IsConnected
+        ? $"UltraStar Play connected on port {Status.HttpPort} ({Status.LoadedSongsCount} songs loaded). Click to refresh."
+        : $"UltraStar Play offline ({Status.ServerAddress}:{Status.HttpPort}). Click to retry.";
+
+    public async ValueTask DisposeAsync()
+    {
+        await _cts.CancelAsync();
+        if (_pollTask != null)
+        {
+            try { await _pollTask; } catch (OperationCanceledException) { }
+        }
+        _cts.Dispose();
+        GC.SuppressFinalize(this);
+    }
+}

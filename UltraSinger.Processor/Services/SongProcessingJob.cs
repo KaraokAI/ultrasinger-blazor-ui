@@ -52,19 +52,26 @@ public class SongProcessingJob(
 
         try
         {
-            await RunUltraSingerAsync(song, jobDirectories);
-
-            try
+            if (song.Source == SongSource.USDB)
             {
-                // Attempt OpenAI-based improvement of UltraStar file
-                await TryImproveUltraStarWithOpenAI(song, jobDirectories);
+                await ProcessUsdbSongAsync(song, jobDirectories);
             }
-            catch (Exception ex)
+            else
             {
-                // Do not fail the job if post-processing fails; just log it.
-                var msg = $"[UltraSinger][PostProcess] Improvement step failed: {ex.Message}";
-                song.AppendLog(msg);
-                logger.LogError(ex, "Post-processing failed for {SongId}", songId);
+                await RunUltraSingerAsync(song, jobDirectories);
+
+                try
+                {
+                    // Attempt OpenAI-based improvement of UltraStar file
+                    await TryImproveUltraStarWithOpenAI(song, jobDirectories);
+                }
+                catch (Exception ex)
+                {
+                    // Do not fail the job if post-processing fails; just log it.
+                    var msg = $"[UltraSinger][PostProcess] Improvement step failed: {ex.Message}";
+                    song.AppendLog(msg);
+                    logger.LogError(ex, "Post-processing failed for {SongId}", songId);
+                }
             }
 
             // Unlike the OpenAI step above, bundling is the actual deliverable — a failure
@@ -247,6 +254,138 @@ public class SongProcessingJob(
         song.AppendLog(msg);
         song.AppendError(msg);
         logger.LogInformation("{Message}", msg);
+    }
+
+    private async Task ProcessUsdbSongAsync(SongRecord song, JobDirectories jobDirectories)
+    {
+        Directory.CreateDirectory(jobDirectories.LocalPath);
+        song.AppendLog("[USDB] Starting processing of USDB song package...");
+
+        if (string.IsNullOrWhiteSpace(song.Url))
+        {
+            throw new ApplicationException("Cannot process USDB song without a media URL.");
+        }
+
+        song.AppendLog($"[USDB] Downloading media from {song.Url} via yt-dlp...");
+
+        var outputTemplate = Path.Combine(jobDirectories.LocalPath, "%(title)s.%(ext)s");
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = environmentalValues.YTDLPPath,
+                Arguments = $"--extract-audio --audio-format mp3 --audio-quality 0 --keep-video -o \"{outputTemplate}\" \"{song.Url}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = jobDirectories.LocalPath
+            }
+        };
+
+        process.OutputDataReceived += (_, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+            {
+                song.AppendLog($"[yt-dlp] {args.Data}");
+                logger.LogInformation("[yt-dlp] {Line}", args.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (_, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+            {
+                song.AppendError($"[yt-dlp] {args.Data}");
+                logger.LogWarning("[yt-dlp error] {Line}", args.Data);
+            }
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            throw new ApplicationException($"yt-dlp failed to download media: {song.ErrorText}");
+        }
+
+        // Identify downloaded audio and video files
+        var allFiles = Directory.GetFiles(jobDirectories.LocalPath);
+        var audioFile = allFiles.FirstOrDefault(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
+                        ?? allFiles.FirstOrDefault(f => f.EndsWith(".m4a", StringComparison.OrdinalIgnoreCase) ||
+                                                        f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase) ||
+                                                        f.EndsWith(".opus", StringComparison.OrdinalIgnoreCase));
+
+        var videoFile = allFiles.FirstOrDefault(f => f.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase))
+                        ?? allFiles.FirstOrDefault(f => f.EndsWith(".mkv", StringComparison.OrdinalIgnoreCase) ||
+                                                        f.EndsWith(".webm", StringComparison.OrdinalIgnoreCase));
+
+        var audioFileName = audioFile != null ? Path.GetFileName(audioFile) : null;
+        var videoFileName = videoFile != null ? Path.GetFileName(videoFile) : null;
+
+        song.AppendLog($"[USDB] Downloaded media files - Audio: {audioFileName ?? "None"}, Video: {videoFileName ?? "None"}");
+
+        var txtContent = song.UltraStarTxt ?? string.Empty;
+        var baseTitle = !string.IsNullOrWhiteSpace(song.Title) ? song.Title : (audioFileName != null ? Path.GetFileNameWithoutExtension(audioFileName) : "Song");
+        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName);
+
+        var sanitizedFileName = string.Join("_", baseTitle.Split(Path.GetInvalidFileNameChars())) + ".txt";
+        var txtFilePath = Path.Combine(jobDirectories.LocalPath, sanitizedFileName);
+
+        await File.WriteAllTextAsync(txtFilePath, updatedTxt, Encoding.UTF8);
+        song.UltraStarTxtPath = sanitizedFileName;
+
+        song.AppendLog($"[USDB] Created UltraStar song file: {sanitizedFileName}");
+    }
+
+    public static string UpdateUltraStarTxtHeaders(string txtContent, string? audioFileName, string? videoFileName)
+    {
+        var lines = txtContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList();
+        var hasMp3 = false;
+        var hasVideo = false;
+        var headerEndIndex = 0;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i].Trim();
+            if (line.StartsWith('#'))
+            {
+                headerEndIndex = i + 1;
+                if (line.StartsWith("#MP3:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrEmpty(audioFileName))
+                    {
+                        lines[i] = $"#MP3:{audioFileName}";
+                    }
+                    hasMp3 = true;
+                }
+                else if (line.StartsWith("#VIDEO:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrEmpty(videoFileName))
+                    {
+                        lines[i] = $"#VIDEO:{videoFileName}";
+                    }
+                    hasVideo = true;
+                }
+            }
+            else if (line.Length > 0 && ":*FRG-E".Contains(line[0]))
+            {
+                break;
+            }
+        }
+
+        if (!hasMp3 && !string.IsNullOrEmpty(audioFileName))
+        {
+            lines.Insert(headerEndIndex, $"#MP3:{audioFileName}");
+            headerEndIndex++;
+        }
+
+        if (!hasVideo && !string.IsNullOrEmpty(videoFileName))
+        {
+            lines.Insert(headerEndIndex, $"#VIDEO:{videoFileName}");
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>

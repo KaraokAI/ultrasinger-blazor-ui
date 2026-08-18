@@ -1,0 +1,216 @@
+@using UltraSinger.Blazor.Services
+@using UltraSinger.Contracts
+@inject LocalLibraryService LocalLibraryService
+@inject IUltraStarPlayService UltraStarPlayService
+
+<div class="flex flex-col h-full space-y-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+            <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                <span>📚 Local Song Library</span>
+                <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    @(FilteredSongs.Count) songs
+                </span>
+            </h2>
+            <p class="text-xs text-slate-400">
+                @if (!string.IsNullOrEmpty(LocalLibraryService.LibraryPath))
+                {
+                    <span>Library path: @LocalLibraryService.LibraryPath</span>
+                }
+                else
+                {
+                    <span class="text-amber-400">Library path is not configured in settings.</span>
+                }
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button @onclick="RefreshLibrary" class="px-3 py-1.5 text-xs font-semibold rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition flex items-center gap-1.5">
+                <span class="@(IsRefreshing ? "animate-spin" : "")">🔄</span>
+                <span>Rescan Library</span>
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(FeedbackMessage))
+    {
+        <div class="p-3 rounded-lg text-sm @(IsFeedbackError ? "bg-red-950/80 text-red-200 border border-red-800" : "bg-emerald-950/80 text-emerald-200 border border-emerald-800")">
+            @FeedbackMessage
+        </div>
+    }
+
+    <!-- Search / Filter Bar -->
+    <div class="flex gap-2">
+        <div class="relative flex-grow">
+            <input @bind="SearchQuery" @bind:event="oninput" @bind:after="ApplyFilter"
+                   placeholder="Filter local songs by artist, title, genre, year, edition..."
+                   class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+            @if (!string.IsNullOrEmpty(SearchQuery))
+            {
+                <button @onclick="ClearSearch" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 text-xs">✕</button>
+            }
+        </div>
+    </div>
+
+    <!-- Song List -->
+    <div class="flex-grow overflow-y-auto space-y-2 pr-1">
+        @if (FilteredSongs.Count == 0)
+        {
+            <div class="p-8 text-center text-slate-400 bg-slate-900/50 rounded-lg border border-slate-800">
+                @if (string.IsNullOrEmpty(SearchQuery))
+                {
+                    <p class="text-base font-medium">No songs found in the local library.</p>
+                    <p class="text-xs text-slate-500 mt-1">Check that your Library:LocalPath setting points to your UltraStar songs folder.</p>
+                }
+                else
+                {
+                    <p class="text-base font-medium">No songs matched "@SearchQuery"</p>
+                }
+            </div>
+        }
+        else
+        {
+            @foreach (var song in FilteredSongs)
+            {
+                <div class="flex items-center justify-between p-3 rounded-lg border border-slate-700/80 bg-slate-900/80 hover:bg-slate-800/80 transition">
+                    <div class="flex-grow mr-3 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <strong class="text-slate-100 text-sm truncate font-semibold">
+                                @(string.IsNullOrWhiteSpace(song.Artist) ? song.Title : $"{song.Artist} - {song.Title}")
+                            </strong>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-slate-400">
+                            @if (!string.IsNullOrEmpty(song.Genre))
+                            {
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">@song.Genre</span>
+                            }
+                            @if (!string.IsNullOrEmpty(song.Year))
+                            {
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">@song.Year</span>
+                            }
+                            @if (!string.IsNullOrEmpty(song.Language))
+                            {
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">@song.Language</span>
+                            }
+                            @if (!string.IsNullOrEmpty(song.Edition))
+                            {
+                                <span class="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-900">@song.Edition</span>
+                            }
+                            <span class="text-slate-500">|</span>
+                            @if (song.HasMp3)
+                            {
+                                <span class="text-emerald-400" title="Audio available">🎵 Audio</span>
+                            }
+                            @if (song.HasVideo)
+                            {
+                                <span class="text-cyan-400" title="Video available">🎬 Video</span>
+                            }
+                            @if (song.HasCover)
+                            {
+                                <span class="text-amber-400" title="Cover available">🖼️ Cover</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button @onclick="() => QueueInGameAsync(song)"
+                                disabled="@(QueuingSongPath == song.TxtFilePath)"
+                                class="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 disabled:opacity-50 text-white transition flex items-center gap-1.5 shadow-sm">
+                            @if (QueuingSongPath == song.TxtFilePath)
+                            {
+                                <span class="animate-spin">⏳</span>
+                                <span>Queuing...</span>
+                            }
+                            else
+                            {
+                                <span>🎮</span>
+                                <span>Queue in Game</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private string SearchQuery { get; set; } = string.Empty;
+    private List<LocalSongResult> FilteredSongs { get; set; } = new();
+    private bool IsRefreshing { get; set; } = false;
+    private string? FeedbackMessage { get; set; }
+    private bool IsFeedbackError { get; set; }
+    private string? QueuingSongPath { get; set; }
+
+    protected override void OnInitialized()
+    {
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        FilteredSongs = LocalLibraryService.Search(SearchQuery);
+    }
+
+    private void ClearSearch()
+    {
+        SearchQuery = string.Empty;
+        ApplyFilter();
+    }
+
+    private void RefreshLibrary()
+    {
+        IsRefreshing = true;
+        try
+        {
+            LocalLibraryService.Refresh();
+            ApplyFilter();
+            FeedbackMessage = $"Library refreshed: {FilteredSongs.Count} songs found.";
+            IsFeedbackError = false;
+        }
+        catch (Exception ex)
+        {
+            FeedbackMessage = $"Failed to scan library: {ex.Message}";
+            IsFeedbackError = true;
+        }
+        finally
+        {
+            IsRefreshing = false;
+        }
+    }
+
+    private async Task QueueInGameAsync(LocalSongResult song)
+    {
+        QueuingSongPath = song.TxtFilePath;
+        FeedbackMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await UltraStarPlayService.EnqueueSongAsync(
+                song.Artist,
+                song.Title,
+                song.TxtFilePath);
+
+            if (success)
+            {
+                FeedbackMessage = $"🎮 Enqueued '{song.Artist} - {song.Title}' in UltraStar Play!";
+                IsFeedbackError = false;
+            }
+            else
+            {
+                FeedbackMessage = $"Could not queue '{song.Artist} - {song.Title}' in UltraStar Play. Ensure the game is running.";
+                IsFeedbackError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            FeedbackMessage = $"Error: {ex.Message}";
+            IsFeedbackError = true;
+        }
+        finally
+        {
+            QueuingSongPath = null;
+            StateHasChanged();
+        }
+    }
+}

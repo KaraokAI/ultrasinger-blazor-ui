@@ -17,6 +17,9 @@ namespace UltraSinger.Blazor.Services;
 public class BundleFetchService(
     ProcessorApiClient processor,
     IOptionsMonitor<LibraryConfiguration> options,
+    IOptionsMonitor<UltraStarPlayConfiguration> uspOptions,
+    IUltraStarPlayService ultraStarPlayService,
+    LocalLibraryService localLibraryService,
     ILogger<BundleFetchService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -72,9 +75,21 @@ public class BundleFetchService(
             return;
         }
 
+        string? extractedTxtPath = null;
         try
         {
             Directory.CreateDirectory(localPath);
+
+            // Read entries before extracting to identify the txt file path
+            using (var zipArchive = ZipFile.OpenRead(tempZip))
+            {
+                var txtEntry = zipArchive.Entries.FirstOrDefault(e => e.FullName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase));
+                if (txtEntry != null)
+                {
+                    extractedTxtPath = Path.Combine(localPath, txtEntry.FullName);
+                }
+            }
+
             ZipFile.ExtractToDirectory(tempZip, localPath, overwriteFiles: true);
         }
         catch (Exception ex)
@@ -90,6 +105,62 @@ public class BundleFetchService(
         if (!await processor.AckBundleFetchedAsync(song.Id, cancellationToken))
         {
             logger.LogWarning("Extracted bundle for {SongId} but ack failed; will retry next poll.", song.Id);
+        }
+
+        // Refresh local library cache
+        try
+        {
+            localLibraryService.Refresh();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to refresh local library cache after extracting {SongId}", song.Id);
+        }
+
+        // Check if Auto-queue to UltraStar Play is enabled
+        var uspConfig = uspOptions.CurrentValue;
+        if (uspConfig.Enabled && uspConfig.AutoQueueOnCompletion)
+        {
+            try
+            {
+                string artist = string.Empty;
+                string title = song.Title ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(extractedTxtPath) && File.Exists(extractedTxtPath))
+                {
+                    var parsed = LocalLibraryService.ParseUltraStarTxtFile(extractedTxtPath);
+                    if (parsed != null)
+                    {
+                        artist = parsed.Artist;
+                        title = parsed.Title;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(artist) && title.Contains(" - "))
+                {
+                    var parts = title.Split(" - ", 2);
+                    artist = parts[0].Trim();
+                    title = parts[1].Trim();
+                }
+
+                if (!string.IsNullOrWhiteSpace(title))
+                {
+                    logger.LogInformation("Auto-queueing newly downloaded song '{Artist} - {Title}' to UltraStar Play...", artist, title);
+                    var queued = await ultraStarPlayService.EnqueueSongAsync(artist, title, extractedTxtPath, cancellationToken: cancellationToken);
+                    if (queued)
+                    {
+                        logger.LogInformation("Successfully auto-queued song '{Artist} - {Title}' in UltraStar Play.", artist, title);
+                    }
+                    else
+                    {
+                        logger.LogWarning("Could not auto-queue '{Artist} - {Title}' in UltraStar Play (is the game running?).", artist, title);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error while attempting auto-queue for song {SongId} to UltraStar Play", song.Id);
+            }
         }
     }
 

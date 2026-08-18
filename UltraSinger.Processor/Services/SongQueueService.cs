@@ -39,7 +39,7 @@ public class SongQueueService(
             title = await TryResolveTitleAsync(request.Url);
         }
 
-        var record = store.Add(request.Url, title);
+        var record = store.Add(request.Url, title, request.Source, request.UsdbSongId, request.UltraStarTxt);
 
         var songId = record.Id;
         record.JobId = jobClient.Enqueue<SongProcessingJob>(Queues.SongQueue, job => job.ProcessAsync(songId));

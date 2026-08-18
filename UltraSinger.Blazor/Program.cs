@@ -16,6 +16,8 @@ builder.Services.Configure<YouTubeAPIConfiguration>(opts =>
 });
 
 builder.Services.Configure<LibraryConfiguration>(builder.Configuration.GetSection("Library"));
+builder.Services.Configure<UsdbConfiguration>(builder.Configuration.GetSection("USDB"));
+builder.Services.Configure<UltraStarPlayConfiguration>(builder.Configuration.GetSection("UltraStarPlay"));
 
 var processorConfiguration = builder.Configuration.GetSection("Processor").Get<ProcessorConfiguration>()
                              ?? new ProcessorConfiguration();
@@ -41,7 +43,15 @@ builder.Services.AddHttpClient<ProcessorApiClient>(client =>
     }
 });
 
+builder.Services.AddHttpClient<IUltraStarPlayService, UltraStarPlayService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
 builder.Services.AddScoped<YouTubeAPIService>();
+builder.Services.AddSingleton<UsdbService>();
+builder.Services.AddSingleton<LocalLibraryService>();
+builder.Services.AddScoped<UnifiedSearchService>();
 builder.Services.AddHostedService<BundleFetchService>();
 
 var app = builder.Build();
