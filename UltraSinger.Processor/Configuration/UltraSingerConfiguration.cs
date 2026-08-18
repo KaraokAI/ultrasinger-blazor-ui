@@ -18,6 +18,13 @@ public record UltraSingerConfiguration
     public string? UltraSingerAdditionalEnvVars { get; init; }
     public string? YTDLPPath { get; init; }
 
+    /// <summary>
+    /// ffmpeg/ffprobe executable used to verify and, if necessary, re-encode USDB video
+    /// downloads to H.264 before bundling. Defaults to "ffmpeg"/"ffprobe" on PATH.
+    /// </summary>
+    public string? FfmpegPath { get; init; }
+    public string? FfprobePath { get; init; }
+
     // Vocal separation configuration (USDB downloads only). Configured the same way as
     // PythonExecutable/PythonArguments/UltraSingerPath above, so it can point at a separate
     // conda env (e.g. one with just demucs) without code changes.

@@ -30,6 +30,10 @@ public class EnvironmentalValuesService(
 
     public string YTDLPPath => Configuration.YTDLPPath ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:YTDLPPath is not set.");
 
+    public string FfmpegPath => string.IsNullOrWhiteSpace(Configuration.FfmpegPath) ? "ffmpeg" : Configuration.FfmpegPath;
+
+    public string FfprobePath => string.IsNullOrWhiteSpace(Configuration.FfprobePath) ? "ffprobe" : Configuration.FfprobePath;
+
     // Vocal separation settings (USDB downloads only)
     public bool EnableVocalSeparation => Configuration.EnableVocalSeparation;
     public string? VocalSeparationExecutable => Configuration.VocalSeparationExecutable;

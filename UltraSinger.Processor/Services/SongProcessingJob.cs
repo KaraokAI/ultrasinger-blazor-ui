@@ -271,10 +271,17 @@ public class SongProcessingJob(
         // Because the job root ends up containing exactly this one folder, BundleSongAsync's
         // existing includeBaseDirectory:false zip naturally wraps the song in its own folder
         // too, same as the YouTube path.
+        //
+        // The folder itself is named "song" - NOT the title - for exactly the same reason the
+        // files inside it are named "yt.*": every path in here gets passed through a shell to
+        // demucs, and SanitisePath only escapes spaces. A title containing parens/quotes/&
+        // baked into the *directory* name would break that shell call just as surely as it
+        // would in a filename. Only once demucs is done with this path do we rename the folder
+        // itself to the real title, below.
         var sanitizedBaseTitle = SanitiseFileNameComponent(!string.IsNullOrWhiteSpace(song.Title) ? song.Title : "Song");
         var songDirectories = new JobDirectories(
-            LocalPath: Path.Combine(jobDirectories.LocalPath, sanitizedBaseTitle),
-            WslPath: $"{jobDirectories.WslPath.TrimEnd('/')}/{sanitizedBaseTitle}");
+            LocalPath: Path.Combine(jobDirectories.LocalPath, "song"),
+            WslPath: $"{jobDirectories.WslPath.TrimEnd('/')}/song");
 
         Directory.CreateDirectory(songDirectories.LocalPath);
 
@@ -285,12 +292,18 @@ public class SongProcessingJob(
         // spaces. Every downstream tool (demucs) is invoked through a shell, so the file
         // stays as this fixed, boring name until it's renamed to the real title below.
         var outputTemplate = Path.Combine(songDirectories.LocalPath, "yt.%(ext)s");
+
+        // UltraStar Deluxe (and the bundled video player) need H.264: bias yt-dlp towards an
+        // avc1 stream up front so the ffprobe/ffmpeg fallback below is rarely needed, rather
+        // than routinely re-encoding a VP9/AV1 download after the fact.
+        const string formatSelector = "bestvideo[vcodec^=avc1]+bestaudio/best[vcodec^=avc1]/bestvideo+bestaudio/best";
+
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = environmentalValues.YTDLPPath,
-                Arguments = $"--extract-audio --cookies-from-browser firefox --audio-format mp3 --audio-quality 0 --keep-video -o \"{outputTemplate}\" \"{song.Url}\"",
+                Arguments = $"-f \"{formatSelector}\" --merge-output-format mp4 --extract-audio --cookies-from-browser firefox --audio-format mp3 --audio-quality 0 --keep-video -o \"{outputTemplate}\" \"{song.Url}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 WorkingDirectory = songDirectories.LocalPath
@@ -341,6 +354,11 @@ public class SongProcessingJob(
 
         song.AppendLog($"[USDB] Downloaded media files - Audio: {audioFileName ?? "None"}, Video: {videoFileName ?? "None"}");
 
+        if (videoFileName != null)
+        {
+            videoFileName = await EnsureH264Async(song, songDirectories.LocalPath, videoFileName);
+        }
+
         string? vocalsFileName = null;
         string? instrumentalFileName = null;
 
@@ -358,16 +376,25 @@ public class SongProcessingJob(
             }
         }
 
-        // Only now that every shell-invoked tool (demucs) is done with the "yt.*" files do we
-        // rename them to the real title; anything shell-unsafe in the title can no longer
-        // break a command line.
+        // Only now that every shell-invoked tool (demucs) is done with the "song/yt.*" path do
+        // we rename the folder and its files to the real title; anything shell-unsafe in the
+        // title can no longer break a command line.
+        var titledLocalPath = Path.Combine(jobDirectories.LocalPath, sanitizedBaseTitle);
+        Directory.Move(songDirectories.LocalPath, titledLocalPath);
+        songDirectories = songDirectories with { LocalPath = titledLocalPath };
+
         audioFileName = RenameToTitledFile(songDirectories.LocalPath, audioFileName, sanitizedBaseTitle);
         videoFileName = RenameToTitledFile(songDirectories.LocalPath, videoFileName, sanitizedBaseTitle);
         vocalsFileName = RenameToTitledFile(songDirectories.LocalPath, vocalsFileName, sanitizedBaseTitle, " [Vocals]");
         instrumentalFileName = RenameToTitledFile(songDirectories.LocalPath, instrumentalFileName, sanitizedBaseTitle, " [Instrumental]");
 
+        // Once vocals/instrumental exist, the full mix is redundant background noise for the
+        // client bundle - the instrumental is what UltraStar Deluxe should actually play back.
+        var hasSeparatedStems = vocalsFileName != null && instrumentalFileName != null;
+        var mp3FileName = hasSeparatedStems ? instrumentalFileName : audioFileName;
+
         var txtContent = song.UltraStarTxt ?? string.Empty;
-        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName, vocalsFileName, instrumentalFileName);
+        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, mp3FileName, videoFileName, vocalsFileName, instrumentalFileName);
 
         var sanitizedFileName = sanitizedBaseTitle + ".txt";
         var txtFilePath = Path.Combine(songDirectories.LocalPath, sanitizedFileName);
@@ -376,6 +403,97 @@ public class SongProcessingJob(
         song.UltraStarTxtPath = sanitizedFileName;
 
         song.AppendLog($"[USDB] Created UltraStar song file: {sanitizedFileName}");
+
+        // Only the files actually referenced by the .txt (plus the .txt itself) should reach
+        // the client - not the full mix once it's superseded, and not any other yt-dlp/demucs
+        // leftovers.
+        var filesToKeep = new[] { mp3FileName, videoFileName, hasSeparatedStems ? vocalsFileName : null, sanitizedFileName }
+            .Where(f => f != null)
+            .Select(f => f!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in Directory.GetFiles(songDirectories.LocalPath))
+        {
+            if (!filesToKeep.Contains(Path.GetFileName(file)))
+            {
+                File.Delete(file);
+            }
+        }
+    }
+
+    /// <summary>
+    /// UltraStar Deluxe requires H.264 video; yt-dlp's format selector already biases towards
+    /// avc1, but some USDB sources only offer VP9/AV1, so this is the guaranteed fallback -
+    /// probe the downloaded video and re-encode with ffmpeg if it isn't already H.264.
+    /// </summary>
+    private async Task<string> EnsureH264Async(SongRecord song, string localDir, string videoFileName)
+    {
+        var videoPath = Path.Combine(localDir, videoFileName);
+        var codec = await ProbeVideoCodecAsync(videoPath);
+
+        if (string.Equals(codec, "h264", StringComparison.OrdinalIgnoreCase))
+        {
+            return videoFileName;
+        }
+
+        song.AppendLog($"[ffmpeg] Video codec is '{codec ?? "unknown"}', not H.264; transcoding...");
+
+        var transcodedFileName = Path.GetFileNameWithoutExtension(videoFileName) + "_h264.mp4";
+        var transcodedPath = Path.Combine(localDir, transcodedFileName);
+
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = environmentalValues.FfmpegPath,
+                Arguments = $"-y -i \"{videoPath}\" -c:v libx264 -preset medium -crf 20 -c:a aac \"{transcodedPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            }
+        };
+
+        process.ErrorDataReceived += (_, args) =>
+        {
+            if (!string.IsNullOrWhiteSpace(args.Data))
+            {
+                logger.LogInformation("[ffmpeg] {Line}", args.Data);
+            }
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0 || !File.Exists(transcodedPath))
+        {
+            throw new ApplicationException($"ffmpeg failed to transcode video to H.264 (exit code {process.ExitCode}).");
+        }
+
+        File.Delete(videoPath);
+        song.AppendLog($"[ffmpeg] Transcoded video to H.264: {transcodedFileName}");
+
+        return transcodedFileName;
+    }
+
+    private async Task<string?> ProbeVideoCodecAsync(string videoPath)
+    {
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = environmentalValues.FfprobePath,
+                Arguments = $"-v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 \"{videoPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            }
+        };
+
+        process.Start();
+        var output = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        return process.ExitCode == 0 ? output.Trim() : null;
     }
 
     public static string UpdateUltraStarTxtHeaders(

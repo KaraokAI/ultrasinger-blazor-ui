@@ -68,10 +68,15 @@
                         </div>
 
                         <div class="flex items-center gap-2 flex-shrink-0">
-                            @if (song.State == SongState.COMPLETED)
+                            @if (song.State == SongState.COMPLETED && song.FetchedAt != null)
                             {
                                 <span class="animate-spin">🎤</span>
                                 <span>Ready to sing</span>
+                            }
+                            else if (song.State == SongState.COMPLETED)
+                            {
+                                <span title="Downloading to this device">⬇️</span>
+                                <span>Downloading...</span>
                             }
                         </div>
                     </li>
