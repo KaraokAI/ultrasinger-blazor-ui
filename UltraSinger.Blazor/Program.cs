@@ -46,7 +46,7 @@ builder.Services.AddScoped<YouTubeAPIService>();
 builder.Services.AddSingleton<UsdbService>();
 builder.Services.AddSingleton<LocalLibraryService>();
 builder.Services.AddSingleton<BlazorSongQueueService>();
-builder.Services.AddSingleton<UsdbDownloadService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BlazorSongQueueService>());
 builder.Services.AddScoped<UnifiedSearchService>();
 builder.Services.AddHostedService<BundleFetchService>();
 

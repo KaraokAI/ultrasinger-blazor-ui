@@ -10,4 +10,6 @@ public class SongQueueItem
     public DateTime QueuedAt { get; set; } = DateTime.Now;
     public string? ExtraInfo { get; set; }
     public string? FilePath { get; set; }
+    public bool IsSung { get; set; }
+    public DateTime? SungAt { get; set; }
 }

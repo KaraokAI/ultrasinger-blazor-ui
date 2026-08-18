@@ -2,48 +2,86 @@ using UltraSinger.Contracts;
 
 namespace UltraSinger.Blazor.Services;
 
-public class BlazorSongQueueService
+/// <summary>
+/// Client-side cache of the processor's "sing next" play queue (see
+/// <c>PlayQueueController</c>/<c>PlayQueueStore</c>). Polls the processor on a timer so the
+/// queue survives a processor restart, while keeping the same synchronous-looking surface
+/// (<see cref="Items"/>, <see cref="Count"/>, <see cref="OnQueueChanged"/>, and the mutation
+/// methods) that callers already use from Razor <c>@onclick</c> handlers.
+/// </summary>
+public class BlazorSongQueueService(ProcessorApiClient processor, ILogger<BlazorSongQueueService> logger) : BackgroundService
 {
-    private readonly List<SongQueueItem> _items = new();
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
+
+    private IReadOnlyList<SongQueueItem> _items = [];
     private readonly object _lock = new();
 
     public event Action? OnQueueChanged;
 
     public IReadOnlyList<SongQueueItem> Items
     {
-        get
-        {
-            lock (_lock)
-            {
-                return _items.ToList().AsReadOnly();
-            }
-        }
+        get { lock (_lock) { return _items; } }
     }
 
     public int Count
     {
-        get
+        get { lock (_lock) { return _items.Count; } }
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(PollInterval);
+
+        do
         {
+            await RefreshAsync(stoppingToken);
+        }
+        while (await WaitForNextTickAsync(timer, stoppingToken));
+    }
+
+    private async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var fetched = await processor.GetPlayQueueAsync(cancellationToken);
+
             lock (_lock)
             {
-                return _items.Count;
+                _items = fetched;
             }
+
+            OnQueueChanged?.Invoke();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Shutting down.
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to refresh play queue from processor.");
+        }
+    }
+
+    private static async Task<bool> WaitForNextTickAsync(PeriodicTimer timer, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await timer.WaitForNextTickAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
     }
 
     public void Enqueue(SongQueueItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        lock (_lock)
-        {
-            _items.Add(item);
-        }
-        OnQueueChanged?.Invoke();
+        FireAndRefresh(() => processor.EnqueuePlayQueueItemAsync(item));
     }
 
-    public SongQueueItem Enqueue(string title, string artist = "", SongSource source = SongSource.Local, string? extraInfo = null, string? filePath = null)
-    {
-        var item = new SongQueueItem
+    public void Enqueue(string title, string artist = "", SongSource source = SongSource.Local, string? extraInfo = null, string? filePath = null) =>
+        Enqueue(new SongQueueItem
         {
             Title = title,
             Artist = artist,
@@ -51,80 +89,34 @@ public class BlazorSongQueueService
             ExtraInfo = extraInfo,
             FilePath = filePath,
             QueuedAt = DateTime.Now
-        };
-        Enqueue(item);
-        return item;
-    }
+        });
 
-    public bool Remove(Guid id)
+    public void Remove(Guid id) => FireAndRefresh(() => processor.RemovePlayQueueItemAsync(id));
+
+    public void MoveUp(Guid id) => FireAndRefresh(() => processor.MovePlayQueueItemUpAsync(id));
+
+    public void MoveDown(Guid id) => FireAndRefresh(() => processor.MovePlayQueueItemDownAsync(id));
+
+    public void MarkSung(Guid id) => FireAndRefresh(() => processor.MarkPlayQueueItemSungAsync(id, true));
+
+    public void UnmarkSung(Guid id) => FireAndRefresh(() => processor.MarkPlayQueueItemSungAsync(id, false));
+
+    public void Clear() => FireAndRefresh(() => processor.ClearPlayQueueAsync());
+
+    private void FireAndRefresh(Func<Task> action)
     {
-        bool removed;
-        lock (_lock)
+        _ = Task.Run(async () =>
         {
-            var index = _items.FindIndex(i => i.Id == id);
-            if (index >= 0)
+            try
             {
-                _items.RemoveAt(index);
-                removed = true;
+                await action();
             }
-            else
+            catch (Exception ex)
             {
-                removed = false;
+                logger.LogWarning(ex, "Play queue mutation failed.");
             }
-        }
 
-        if (removed)
-        {
-            OnQueueChanged?.Invoke();
-        }
-        return removed;
-    }
-
-    public void MoveUp(Guid id)
-    {
-        lock (_lock)
-        {
-            var index = _items.FindIndex(i => i.Id == id);
-            if (index > 0)
-            {
-                var item = _items[index];
-                _items.RemoveAt(index);
-                _items.Insert(index - 1, item);
-            }
-            else
-            {
-                return;
-            }
-        }
-        OnQueueChanged?.Invoke();
-    }
-
-    public void MoveDown(Guid id)
-    {
-        lock (_lock)
-        {
-            var index = _items.FindIndex(i => i.Id == id);
-            if (index >= 0 && index < _items.Count - 1)
-            {
-                var item = _items[index];
-                _items.RemoveAt(index);
-                _items.Insert(index + 1, item);
-            }
-            else
-            {
-                return;
-            }
-        }
-        OnQueueChanged?.Invoke();
-    }
-
-    public void Clear()
-    {
-        lock (_lock)
-        {
-            if (_items.Count == 0) return;
-            _items.Clear();
-        }
-        OnQueueChanged?.Invoke();
+            await RefreshAsync(CancellationToken.None);
+        });
     }
 }

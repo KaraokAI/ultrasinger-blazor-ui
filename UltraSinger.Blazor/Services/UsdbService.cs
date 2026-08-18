@@ -320,6 +320,39 @@ public class UsdbService
         return list;
     }
 
+    /// <summary>
+    /// Fetches USDB metadata and builds a processor-ready enqueue request, so USDB songs
+    /// can be submitted to the processor exactly like a YouTube URL. Returns null if the
+    /// song's details, YouTube URL, or UltraStar txt can't be resolved.
+    /// </summary>
+    public async Task<EnqueueSongRequest?> TryBuildEnqueueRequestAsync(int songId)
+    {
+        var details = await GetSongDetailsAsync(songId);
+        if (details == null)
+        {
+            _logger.LogError("Could not fetch details for USDB song {SongId}", songId);
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(details.UltraStarTxt) || string.IsNullOrWhiteSpace(details.YoutubeUrl))
+        {
+            _logger.LogError("USDB song {SongId} is missing a UltraStar txt or YouTube URL", songId);
+            return null;
+        }
+
+        var artist = !string.IsNullOrWhiteSpace(details.Artist) ? details.Artist : "Unknown";
+        var title = !string.IsNullOrWhiteSpace(details.Title) ? details.Title : $"Song_{songId}";
+
+        return new EnqueueSongRequest
+        {
+            Url = details.YoutubeUrl,
+            Title = $"{artist} - {title}",
+            Source = SongSource.USDB,
+            UsdbSongId = songId,
+            UltraStarTxt = details.UltraStarTxt
+        };
+    }
+
     public async Task<UsdbSongDetails?> GetSongDetailsAsync(int songId)
     {
         await EnsureAuthenticatedAsync();

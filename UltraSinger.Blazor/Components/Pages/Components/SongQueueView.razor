@@ -39,7 +39,7 @@
             {
                 var item = Items[i];
                 var index = i;
-                <div class="flex items-center justify-between p-3 rounded-lg border border-slate-700/80 bg-slate-900/80 hover:bg-slate-800/80 transition">
+                <div class="@($"flex items-center justify-between p-3 rounded-lg border border-slate-700/80 bg-slate-900/80 hover:bg-slate-800/80 transition {(item.IsSung ? "opacity-40 grayscale" : "")}")">
                     <div class="flex items-center space-x-3 overflow-hidden flex-grow mr-2">
                         <span class="w-7 h-7 flex items-center justify-center text-xs font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex-shrink-0">
                             @(index + 1)
@@ -86,6 +86,11 @@
                                 class="p-1.5 text-xs rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition"
                                 title="Move Down">
                             ▼
+                        </button>
+                        <button @onclick="() => ToggleSung(item)"
+                                class="@($"p-1.5 text-xs rounded border transition ml-1 {(item.IsSung ? "bg-emerald-900/60 hover:bg-emerald-900 text-emerald-300 border-emerald-800/80" : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700")}")"
+                                title="@(item.IsSung ? "Mark as not sung" : "Mark as sung")">
+                            @(item.IsSung ? "↺" : "✓")
                         </button>
                         <button @onclick="() => Remove(item.Id)"
                                 class="p-1.5 text-xs rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/80 transition ml-1"
