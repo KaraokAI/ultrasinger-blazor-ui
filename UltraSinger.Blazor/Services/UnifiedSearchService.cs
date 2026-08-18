@@ -29,12 +29,20 @@ public class UnifiedSearchService
             return unifiedResults;
         }
 
+        // Used to flag USDB/YouTube rows as "you already have this" even though they're
+        // separate rows from any matching Local row - matched independently of `includeLocal`
+        // so the flag still works when local results are hidden from the list itself.
+        var allLocalSongs = _localLibraryService.Search(query);
+        var localKeys = allLocalSongs
+            .Select(s => NormaliseKey(s.Artist, s.Title))
+            .ToHashSet();
+
         // 1. Local Library (Highest Priority)
         if (includeLocal)
         {
             try
             {
-                var localMatches = _localLibraryService.Search(query);
+                var localMatches = allLocalSongs;
                 foreach (var local in localMatches)
                 {
                     unifiedResults.Add(new UnifiedSearchResult
@@ -70,7 +78,8 @@ public class UnifiedSearchService
                         HasGoldenNotes = usdb.GoldenNotes,
                         UsdbSongId = usdb.Id,
                         ExtraInfo = string.Join(" • ", new[] { usdb.Language, usdb.Genre, usdb.Year?.ToString(), usdb.Edition }.Where(x => !string.IsNullOrWhiteSpace(x))),
-                        UsdbSong = usdb
+                        UsdbSong = usdb,
+                        AlreadyLocal = localKeys.Contains(NormaliseKey(usdb.Artist, usdb.Title))
                     });
                 }
             }
@@ -96,7 +105,12 @@ public class UnifiedSearchService
                         Url = $"https://www.youtube.com/watch?v={yt.VideoId}",
                         YouTubeVideoId = yt.VideoId,
                         ThumbnailUrl = yt.ThumbnailUrl,
-                        Description = yt.Title
+                        Description = yt.Title,
+                        // YouTube titles are freeform (not "Artist - Title"), so an exact key
+                        // match is too strict - fall back to "does the local song's
+                        // artist+title both appear in this video's title" instead.
+                        AlreadyLocal = allLocalSongs.Any(local =>
+                            ContainsWords(yt.Title, local.Artist) && ContainsWords(yt.Title, local.Title))
                     });
                 }
             }
@@ -107,5 +121,21 @@ public class UnifiedSearchService
         }
 
         return unifiedResults;
+    }
+
+    private static string NormaliseKey(string artist, string title) =>
+        Normalise(artist) + "|" + Normalise(title);
+
+    private static string Normalise(string value) =>
+        new(value.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+
+    private static bool ContainsWords(string haystack, string needle)
+    {
+        if (string.IsNullOrWhiteSpace(needle))
+        {
+            return false;
+        }
+
+        return Normalise(haystack).Contains(Normalise(needle), StringComparison.Ordinal);
     }
 }

@@ -25,7 +25,7 @@
             <div class="space-y-2">
                 @foreach (var result in Results)
                 {
-                    <div class="flex items-center justify-between p-3 rounded-lg border transition @(result.Source == SongSource.Local ? "border-emerald-500 bg-emerald-950/40 hover:bg-emerald-950/60 shadow-[0_0_14px_rgba(16,185,129,0.55)]" : "border-slate-700 bg-slate-900/80 hover:bg-slate-800/90")">
+                    <div class="flex items-center justify-between p-3 rounded-lg border transition @(result.Source == SongSource.Local || result.AlreadyLocal ? "border-emerald-500 bg-emerald-950/40 hover:bg-emerald-950/60 shadow-[0_0_14px_rgba(16,185,129,0.55)]" : "border-slate-700 bg-slate-900/80 hover:bg-slate-800/90")">
                         <div class="flex items-center space-x-3 overflow-hidden flex-grow mr-2">
                             @if (!string.IsNullOrWhiteSpace(result.ThumbnailUrl))
                             {
@@ -40,6 +40,10 @@
                                     else if (result.Source == SongSource.USDB)
                                     {
                                         <span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-700 text-blue-100">USDB</span>
+                                        @if (result.AlreadyLocal)
+                                        {
+                                            <span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 text-emerald-100 animate-pulse">LOCAL</span>
+                                        }
                                         @if (result.HasGoldenNotes == true)
                                         {
                                             <span class="px-1.5 py-0.5 text-xs font-bold rounded bg-amber-600 text-amber-100" title="Golden Notes">★ Gold</span>
@@ -52,6 +56,10 @@
                                     else
                                     {
                                         <span class="px-2 py-0.5 text-xs font-bold rounded bg-red-700 text-red-100">YouTube</span>
+                                        @if (result.AlreadyLocal)
+                                        {
+                                            <span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 text-emerald-100 animate-pulse">LOCAL</span>
+                                        }
                                     }
 
                                     <strong class="text-slate-100 truncate">
@@ -94,6 +102,12 @@
                                         <span>Queue</span>
                                     }
                                 </button>
+                            }
+                            else if (result.AlreadyLocal)
+                            {
+                                <span class="px-2.5 py-1 text-xs font-bold text-emerald-200 bg-emerald-900/80 rounded-full border-2 border-emerald-400 animate-pulse">
+                                    ✓ Already Have It
+                                </span>
                             }
                             else if (result.Source == SongSource.USDB)
                             {

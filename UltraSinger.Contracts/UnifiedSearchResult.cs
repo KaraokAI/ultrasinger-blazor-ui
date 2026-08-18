@@ -16,4 +16,10 @@ public class UnifiedSearchResult
     public LocalSongResult? LocalSong { get; set; }
     public UsdbSongResult? UsdbSong { get; set; }
     public string? YouTubeVideoId { get; set; }
+
+    /// <summary>
+    /// True for a USDB/YouTube result whose artist/title already matches something in the
+    /// local library, even though it's a separate row (not itself <see cref="SongSource.Local"/>).
+    /// </summary>
+    public bool AlreadyLocal { get; set; }
 }

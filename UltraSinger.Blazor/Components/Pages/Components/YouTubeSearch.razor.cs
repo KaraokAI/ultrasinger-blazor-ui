@@ -108,6 +108,13 @@ public partial class YouTubeSearch
             return; // Already in local library
         }
 
+        if (result.AlreadyLocal)
+        {
+            FeedbackMessage = $"You already have this locally: {result.DisplayTitle}";
+            StateHasChanged();
+            return;
+        }
+
         FeedbackMessage = null;
 
         if (result.Source == SongSource.USDB && result.UsdbSongId.HasValue)
