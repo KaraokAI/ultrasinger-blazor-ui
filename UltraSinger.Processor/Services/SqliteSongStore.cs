@@ -15,9 +15,12 @@ public class SqliteSongStore(SongDatabase database, ILogger<SqliteSongStore> log
 {
     private readonly ConcurrentDictionary<Guid, SongRecord> _songs = new();
 
+    // Deliberately excludes COMPLETED: whether a completed song is worth reprocessing (e.g.
+    // the local copy went missing) is a call only a remote client can make, since the
+    // processor has no visibility into what's actually on disk at the client end.
     private static readonly SongState[] BlocksRequeue =
     [
-        SongState.COMPLETED, SongState.IN_PROGRESS, SongState.NOT_STARTED
+        SongState.IN_PROGRESS, SongState.NOT_STARTED
     ];
 
     /// <summary>
@@ -79,7 +82,7 @@ public class SqliteSongStore(SongDatabase database, ILogger<SqliteSongStore> log
             .OrderByDescending(x => x.BeganProcessingAt ?? x.CreatedAt)
             .FirstOrDefault();
 
-    public bool HasActiveOrCompleted(string url) =>
+    public bool HasActive(string url) =>
         _songs.Values.Any(x => x.Url == url && BlocksRequeue.Contains(x.State));
 
     public void Remove(Guid id)

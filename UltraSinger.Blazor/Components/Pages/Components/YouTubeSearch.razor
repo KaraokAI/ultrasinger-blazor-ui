@@ -25,7 +25,7 @@
             <div class="space-y-2">
                 @foreach (var result in Results)
                 {
-                    <div class="flex items-center justify-between p-3 rounded-lg border border-slate-700 bg-slate-900/80 hover:bg-slate-800/90 transition">
+                    <div class="flex items-center justify-between p-3 rounded-lg border transition @(result.Source == SongSource.Local ? "border-emerald-500 bg-emerald-950/40 hover:bg-emerald-950/60 shadow-[0_0_14px_rgba(16,185,129,0.55)]" : "border-slate-700 bg-slate-900/80 hover:bg-slate-800/90")">
                         <div class="flex items-center space-x-3 overflow-hidden flex-grow mr-2">
                             @if (!string.IsNullOrWhiteSpace(result.ThumbnailUrl))
                             {
@@ -35,7 +35,7 @@
                                 <div class="flex items-center space-x-2">
                                     @if (result.Source == SongSource.Local)
                                     {
-                                        <span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 text-emerald-100">LOCAL</span>
+                                        <span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 text-emerald-100 animate-pulse">LOCAL</span>
                                     }
                                     else if (result.Source == SongSource.USDB)
                                     {
@@ -77,8 +77,8 @@
                         <div class="flex-shrink-0 flex items-center gap-2">
                             @if (result.Source == SongSource.Local)
                             {
-                                <span class="px-2.5 py-1 text-xs font-semibold text-emerald-300 bg-emerald-950/60 rounded-full border border-emerald-800">
-                                    In Library
+                                <span class="px-2.5 py-1 text-xs font-bold text-emerald-200 bg-emerald-900/80 rounded-full border-2 border-emerald-400 animate-pulse">
+                                    ✓ Already Have It
                                 </span>
                                 <button @onclick="() => OnQueueInGame(result)"
                                         disabled="@(QueuingSongTitle == result.DisplayTitle)"

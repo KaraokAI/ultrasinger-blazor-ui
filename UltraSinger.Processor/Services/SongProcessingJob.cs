@@ -259,7 +259,6 @@ public class SongProcessingJob(
 
     private async Task ProcessUsdbSongAsync(SongRecord song, JobDirectories jobDirectories)
     {
-        Directory.CreateDirectory(jobDirectories.LocalPath);
         song.AppendLog("[USDB] Starting processing of USDB song package...");
 
         if (string.IsNullOrWhiteSpace(song.Url))
@@ -267,18 +266,34 @@ public class SongProcessingJob(
             throw new ApplicationException("Cannot process USDB song without a media URL.");
         }
 
+        // USDB songs, unlike YouTube ones, don't get a per-song folder for free from
+        // UltraSinger.py's own output convention, so we nest everything under one here.
+        // Because the job root ends up containing exactly this one folder, BundleSongAsync's
+        // existing includeBaseDirectory:false zip naturally wraps the song in its own folder
+        // too, same as the YouTube path.
+        var sanitizedBaseTitle = SanitiseFileNameComponent(!string.IsNullOrWhiteSpace(song.Title) ? song.Title : "Song");
+        var songDirectories = new JobDirectories(
+            LocalPath: Path.Combine(jobDirectories.LocalPath, sanitizedBaseTitle),
+            WslPath: $"{jobDirectories.WslPath.TrimEnd('/')}/{sanitizedBaseTitle}");
+
+        Directory.CreateDirectory(songDirectories.LocalPath);
+
         song.AppendLog($"[USDB] Downloading media from {song.Url} via yt-dlp...");
 
-        var outputTemplate = Path.Combine(jobDirectories.LocalPath, "%(title)s.%(ext)s");
+        // Deliberately not "%(title)s.%(ext)s": YouTube titles routinely contain
+        // parens/ampersands/etc. that aren't shell-safe, and SanitisePath only escapes
+        // spaces. Every downstream tool (demucs) is invoked through a shell, so the file
+        // stays as this fixed, boring name until it's renamed to the real title below.
+        var outputTemplate = Path.Combine(songDirectories.LocalPath, "yt.%(ext)s");
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = environmentalValues.YTDLPPath,
-                Arguments = $"--extract-audio --audio-format mp3 --audio-quality 0 --keep-video -o \"{outputTemplate}\" \"{song.Url}\"",
+                Arguments = $"--extract-audio --cookies-from-browser firefox --audio-format mp3 --audio-quality 0 --keep-video -o \"{outputTemplate}\" \"{song.Url}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = jobDirectories.LocalPath
+                WorkingDirectory = songDirectories.LocalPath
             }
         };
 
@@ -311,7 +326,7 @@ public class SongProcessingJob(
         }
 
         // Identify downloaded audio and video files
-        var allFiles = Directory.GetFiles(jobDirectories.LocalPath);
+        var allFiles = Directory.GetFiles(songDirectories.LocalPath);
         var audioFile = allFiles.FirstOrDefault(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
                         ?? allFiles.FirstOrDefault(f => f.EndsWith(".m4a", StringComparison.OrdinalIgnoreCase) ||
                                                         f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase) ||
@@ -333,7 +348,7 @@ public class SongProcessingJob(
         {
             try
             {
-                (vocalsFileName, instrumentalFileName) = await vocalSeparationService.SeparateAsync(song, jobDirectories, audioFileName);
+                (vocalsFileName, instrumentalFileName) = await vocalSeparationService.SeparateAsync(song, songDirectories, audioFileName);
             }
             catch (Exception ex)
             {
@@ -343,12 +358,19 @@ public class SongProcessingJob(
             }
         }
 
+        // Only now that every shell-invoked tool (demucs) is done with the "yt.*" files do we
+        // rename them to the real title; anything shell-unsafe in the title can no longer
+        // break a command line.
+        audioFileName = RenameToTitledFile(songDirectories.LocalPath, audioFileName, sanitizedBaseTitle);
+        videoFileName = RenameToTitledFile(songDirectories.LocalPath, videoFileName, sanitizedBaseTitle);
+        vocalsFileName = RenameToTitledFile(songDirectories.LocalPath, vocalsFileName, sanitizedBaseTitle, " [Vocals]");
+        instrumentalFileName = RenameToTitledFile(songDirectories.LocalPath, instrumentalFileName, sanitizedBaseTitle, " [Instrumental]");
+
         var txtContent = song.UltraStarTxt ?? string.Empty;
-        var baseTitle = !string.IsNullOrWhiteSpace(song.Title) ? song.Title : (audioFileName != null ? Path.GetFileNameWithoutExtension(audioFileName) : "Song");
         var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName, vocalsFileName, instrumentalFileName);
 
-        var sanitizedFileName = string.Join("_", baseTitle.Split(Path.GetInvalidFileNameChars())) + ".txt";
-        var txtFilePath = Path.Combine(jobDirectories.LocalPath, sanitizedFileName);
+        var sanitizedFileName = sanitizedBaseTitle + ".txt";
+        var txtFilePath = Path.Combine(songDirectories.LocalPath, sanitizedFileName);
 
         await File.WriteAllTextAsync(txtFilePath, updatedTxt, Encoding.UTF8);
         song.UltraStarTxtPath = sanitizedFileName;
@@ -403,4 +425,30 @@ public class SongProcessingJob(
     }
 
     public static string SanitisePath(string source) => source.Replace(" ", "\\ ");
+
+    private static string SanitiseFileNameComponent(string source) =>
+        string.Join("_", source.Split(Path.GetInvalidFileNameChars()));
+
+    /// <summary>
+    /// Renames a "yt.*"-style download (or a demucs stem derived from one) to the real,
+    /// human-readable title now that no further shell command will see its path.
+    /// </summary>
+    private static string? RenameToTitledFile(string localDir, string? currentFileName, string sanitizedBaseTitle, string suffix = "")
+    {
+        if (currentFileName == null)
+        {
+            return null;
+        }
+
+        var newFileName = sanitizedBaseTitle + suffix + Path.GetExtension(currentFileName);
+        var oldPath = Path.Combine(localDir, currentFileName);
+        var newPath = Path.Combine(localDir, newFileName);
+
+        if (!string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+        {
+            File.Move(oldPath, newPath, overwrite: true);
+        }
+
+        return newFileName;
+    }
 }

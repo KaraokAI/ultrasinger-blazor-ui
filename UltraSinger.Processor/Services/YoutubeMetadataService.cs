@@ -28,7 +28,7 @@ public class YoutubeMetadataService(EnvironmentalValuesService environmentalValu
         OutputBuffer = new StringBuilder();
 
         ytdlProcess.OutputReceived += OutputData;
-        var result = await ytdlProcess.RunAsync(new[] { url }, new OptionSet { Print = "title" });
+        var result = await ytdlProcess.RunAsync(new[] { url }, new OptionSet { Print = "title", CookiesFromBrowser = "firefox" });
         ytdlProcess.OutputReceived -= OutputData;
 
         return result == 0

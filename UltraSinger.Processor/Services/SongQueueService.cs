@@ -23,7 +23,7 @@ public class SongQueueService(
 {
     public async Task<(EnqueueOutcome Outcome, SongDto Song)> EnqueueAsync(EnqueueSongRequest request)
     {
-        if (store.HasActiveOrCompleted(request.Url))
+        if (store.HasActive(request.Url))
         {
             // Already processed/processing/will be processed.
             var existing = store.GetAll().First(x => x.Url == request.Url);
