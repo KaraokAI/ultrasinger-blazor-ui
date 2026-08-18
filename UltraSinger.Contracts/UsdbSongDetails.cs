@@ -10,4 +10,7 @@ public class UsdbSongDetails
     public string? CoverUrl { get; set; }
     public double? Gap { get; set; }
     public double? Bpm { get; set; }
+    public int? Year { get; set; }
+    public string? Genre { get; set; }
+    public string? Language { get; set; }
 }

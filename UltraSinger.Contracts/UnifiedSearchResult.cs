@@ -11,7 +11,7 @@ public class UnifiedSearchResult
     public string? Description { get; set; }
     public string? ExtraInfo { get; set; }
     public double? Rating { get; set; }
-    public bool HasGoldenNotes { get; set; }
+    public bool? HasGoldenNotes { get; set; }
     public int? UsdbSongId { get; set; }
     public LocalSongResult? LocalSong { get; set; }
     public UsdbSongResult? UsdbSong { get; set; }

@@ -13,6 +13,9 @@ public partial class AddSong : ComponentBase
     [Inject]
     private UsdbService UsdbService { get; set; } = null!;
 
+    [Inject]
+    private UsdbDownloadService UsdbDownloadService { get; set; } = null!;
+
     private string? SongUrl { get; set; }
 
     private bool IsAdding { get; set; }
@@ -54,16 +57,9 @@ public partial class AddSong : ComponentBase
                 var idStr = !string.IsNullOrEmpty(usdbMatch.Groups[1].Value) ? usdbMatch.Groups[1].Value : usdbMatch.Groups[2].Value;
                 if (int.TryParse(idStr, out var songId))
                 {
-                    var details = await UsdbService.GetSongDetailsAsync(songId);
-                    if (details != null && !string.IsNullOrWhiteSpace(details.YoutubeUrl))
-                    {
-                        var title = !string.IsNullOrWhiteSpace(details.Artist) && !string.IsNullOrWhiteSpace(details.Title)
-                            ? $"{details.Artist} - {details.Title}"
-                            : details.Title;
-                        await Processor.EnqueueAsync(details.YoutubeUrl, title, SongSource.USDB, details.Id, details.UltraStarTxt);
-                        SongUrl = string.Empty;
-                        return;
-                    }
+                    _ = Task.Run(async () => await UsdbDownloadService.DownloadSongAsync(songId));
+                    SongUrl = string.Empty;
+                    return;
                 }
             }
 

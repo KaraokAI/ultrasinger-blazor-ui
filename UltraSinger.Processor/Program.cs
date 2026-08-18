@@ -20,6 +20,7 @@ builder.Services
     .AddScoped<YTDLPService>()
     .AddScoped<SyncedLyricsService>()
     .AddScoped<OpenAIImproverService>()
+    .AddScoped<VocalSeparationService>()
     .AddScoped<SongQueueService>()
     // Resolved by Hangfire for each job execution.
     .AddScoped<SongProcessingJob>();

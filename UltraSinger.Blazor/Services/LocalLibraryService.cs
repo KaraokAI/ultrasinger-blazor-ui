@@ -21,7 +21,7 @@ public class LocalLibraryService
 
     public string? LibraryPath => _configuration.LocalPath;
 
-    public IReadOnlyList<LocalSongResult> GetAll()
+    public IList<LocalSongResult> GetAll()
     {
         lock (_lock)
         {
@@ -45,22 +45,24 @@ public class LocalLibraryService
     public List<LocalSongResult> Search(string query)
     {
         var songs = GetAll();
-        if (string.IsNullOrWhiteSpace(query))
+        if (!string.IsNullOrWhiteSpace(query))
         {
-            return songs.ToList();
+            var terms = query.Split(new[] { ' ', '-', ':', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            songs = songs
+                .Where(song =>
+                {
+                    var matchTitle = terms.All(t => song.Title.Contains(t, StringComparison.OrdinalIgnoreCase) ||
+                                                    song.Artist.Contains(t, StringComparison.OrdinalIgnoreCase) ||
+                                                    (song.Genre != null && song.Genre.Contains(t,
+                                                        StringComparison.OrdinalIgnoreCase)) ||
+                                                    (song.Edition != null && song.Edition.Contains(t,
+                                                        StringComparison.OrdinalIgnoreCase)));
+                    return matchTitle;
+                }).ToList();
         }
 
-        var terms = query.Split(new[] { ' ', '-', ':', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
         return songs
-            .Where(song =>
-            {
-                var matchTitle = terms.All(t => song.Title.Contains(t, StringComparison.OrdinalIgnoreCase) ||
-                                                song.Artist.Contains(t, StringComparison.OrdinalIgnoreCase) ||
-                                                (song.Genre != null && song.Genre.Contains(t, StringComparison.OrdinalIgnoreCase)) ||
-                                                (song.Edition != null && song.Edition.Contains(t, StringComparison.OrdinalIgnoreCase)));
-                return matchTitle;
-            })
             .OrderBy(s => s.Artist)
             .ThenBy(s => s.Title)
             .ToList();

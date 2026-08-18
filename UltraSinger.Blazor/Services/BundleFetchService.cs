@@ -17,8 +17,8 @@ namespace UltraSinger.Blazor.Services;
 public class BundleFetchService(
     ProcessorApiClient processor,
     IOptionsMonitor<LibraryConfiguration> options,
-    IOptionsMonitor<UltraStarPlayConfiguration> uspOptions,
     LocalLibraryService localLibraryService,
+    BlazorSongQueueService songQueueService,
     ILogger<BundleFetchService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -116,36 +116,42 @@ public class BundleFetchService(
             logger.LogWarning(ex, "Failed to refresh local library cache after extracting {SongId}", song.Id);
         }
 
-        // Check if Auto-queue to UltraStar Play is enabled
-        var uspConfig = uspOptions.CurrentValue;
-        if (uspConfig.Enabled && uspConfig.AutoQueueOnCompletion)
+        // Determine artist and title
+        string artist = string.Empty;
+        string title = song.Title ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(extractedTxtPath) && File.Exists(extractedTxtPath))
         {
-            try
+            var parsed = LocalLibraryService.ParseUltraStarTxtFile(extractedTxtPath);
+            if (parsed != null)
             {
-                string artist = string.Empty;
-                string title = song.Title ?? string.Empty;
-
-                if (!string.IsNullOrEmpty(extractedTxtPath) && File.Exists(extractedTxtPath))
-                {
-                    var parsed = LocalLibraryService.ParseUltraStarTxtFile(extractedTxtPath);
-                    if (parsed != null)
-                    {
-                        artist = parsed.Artist;
-                        title = parsed.Title;
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(artist) && title.Contains(" - "))
-                {
-                    var parts = title.Split(" - ", 2);
-                    artist = parts[0].Trim();
-                    title = parts[1].Trim();
-                }
+                artist = parsed.Artist;
+                title = parsed.Title;
             }
-            catch (Exception ex)
+        }
+
+        if (string.IsNullOrWhiteSpace(artist) && title.Contains(" - "))
+        {
+            var parts = title.Split(" - ", 2);
+            artist = parts[0].Trim();
+            title = parts[1].Trim();
+        }
+
+        // Automatically add to Blazor song queue
+        try
+        {
+            songQueueService.Enqueue(new SongQueueItem
             {
-                logger.LogError(ex, "Error while attempting auto-queue for song {SongId} to UltraStar Play", song.Id);
-            }
+                Title = title,
+                Artist = artist,
+                Source = song.Source,
+                FilePath = extractedTxtPath,
+                QueuedAt = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue song {SongId} to Blazor song queue.", song.Id);
         }
     }
 

@@ -22,6 +22,17 @@
                     <span>📚</span>
                     <span>Song Library</span>
                 </button>
+                <button @onclick="() => SetActiveTab(TabType.Queue)"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-md transition flex items-center gap-1.5 @(ActiveTab == TabType.Queue ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60")">
+                    <span>🎵</span>
+                    <span>Song Queue</span>
+                    @if (SongQueueService.Count > 0)
+                    {
+                        <span class="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-pink-500 text-white">
+                            @SongQueueService.Count
+                        </span>
+                    }
+                </button>
                 <button @onclick="() => SetActiveTab(TabType.Downloads)"
                         class="px-3 py-1.5 text-xs font-semibold rounded-md transition flex items-center gap-1.5 @(ActiveTab == TabType.Downloads ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60")">
                     <span>📥</span>
@@ -69,6 +80,12 @@
             case TabType.Library:
                 <div class="h-full min-h-0">
                     <SongLibraryView />
+                </div>
+                break;
+
+            case TabType.Queue:
+                <div class="h-full min-h-0">
+                    <SongQueueView />
                 </div>
                 break;
 

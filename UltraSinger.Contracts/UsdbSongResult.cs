@@ -9,7 +9,7 @@ public class UsdbSongResult
     public string? Genre { get; set; }
     public int? Year { get; set; }
     public string? Language { get; set; }
-    public bool GoldenNotes { get; set; }
+    public bool? GoldenNotes { get; set; }
     public double Rating { get; set; }
     public int Views { get; set; }
     public string? YoutubeId { get; set; }

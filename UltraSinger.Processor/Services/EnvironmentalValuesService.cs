@@ -30,6 +30,12 @@ public class EnvironmentalValuesService(
 
     public string YTDLPPath => Configuration.YTDLPPath ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:YTDLPPath is not set.");
 
+    // Vocal separation settings (USDB downloads only)
+    public bool EnableVocalSeparation => Configuration.EnableVocalSeparation;
+    public string? VocalSeparationExecutable => Configuration.VocalSeparationExecutable;
+    public string VocalSeparationArguments => Configuration.VocalSeparationArguments ?? "";
+    public string VocalSeparationAdditionalArgs => Configuration.VocalSeparationAdditionalArgs;
+
     // OpenAI settings
     public string? OpenAIKey => Configuration.OpenAIKey;
     public string OpenAIModel => Configuration.OpenAIModel ?? "gpt-5-nano";
@@ -148,6 +154,11 @@ public class EnvironmentalValuesService(
         if (!Directory.Exists(DatabaseDirectory))
         {
             problems.Add($"Database directory does not exist: {DatabaseDirectory}");
+        }
+
+        if (Configuration.EnableVocalSeparation && string.IsNullOrWhiteSpace(Configuration.VocalSeparationExecutable))
+        {
+            problems.Add("Vocal separation is enabled but ProcessorOptions:VocalSeparationExecutable is not set.");
         }
 
         return problems;

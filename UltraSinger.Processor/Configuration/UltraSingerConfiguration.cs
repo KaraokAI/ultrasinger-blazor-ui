@@ -18,6 +18,14 @@ public record UltraSingerConfiguration
     public string? UltraSingerAdditionalEnvVars { get; init; }
     public string? YTDLPPath { get; init; }
 
+    // Vocal separation configuration (USDB downloads only). Configured the same way as
+    // PythonExecutable/PythonArguments/UltraSingerPath above, so it can point at a separate
+    // conda env (e.g. one with just demucs) without code changes.
+    public bool EnableVocalSeparation { get; init; } = false;
+    public string? VocalSeparationExecutable { get; init; }
+    public string? VocalSeparationArguments { get; init; }
+    public string VocalSeparationAdditionalArgs { get; init; } = "-n htdemucs_ft --two-stems=vocals";
+
     /// <summary>
     /// Directory holding <c>songs.db</c> and <c>hangfire.db</c>. Defaults to the content root.
     /// </summary>

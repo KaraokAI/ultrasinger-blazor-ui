@@ -26,6 +26,7 @@ public class SongProcessingJob(
     EnvironmentalValuesService environmentalValues,
     SyncedLyricsService lyricsService,
     OpenAIImproverService openAIImproverService,
+    VocalSeparationService vocalSeparationService,
     ILogger<SongProcessingJob> logger)
 {
     private const string OutputLeadingText = "Parse ultrastar txt -> ";
@@ -325,9 +326,26 @@ public class SongProcessingJob(
 
         song.AppendLog($"[USDB] Downloaded media files - Audio: {audioFileName ?? "None"}, Video: {videoFileName ?? "None"}");
 
+        string? vocalsFileName = null;
+        string? instrumentalFileName = null;
+
+        if (environmentalValues.EnableVocalSeparation && audioFileName != null)
+        {
+            try
+            {
+                (vocalsFileName, instrumentalFileName) = await vocalSeparationService.SeparateAsync(song, jobDirectories, audioFileName);
+            }
+            catch (Exception ex)
+            {
+                var msg = $"[demucs] Vocal separation failed: {ex.Message}";
+                song.AppendLog(msg);
+                logger.LogError(ex, "Vocal separation failed for {SongId}", song.Id);
+            }
+        }
+
         var txtContent = song.UltraStarTxt ?? string.Empty;
         var baseTitle = !string.IsNullOrWhiteSpace(song.Title) ? song.Title : (audioFileName != null ? Path.GetFileNameWithoutExtension(audioFileName) : "Song");
-        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName);
+        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName, vocalsFileName, instrumentalFileName);
 
         var sanitizedFileName = string.Join("_", baseTitle.Split(Path.GetInvalidFileNameChars())) + ".txt";
         var txtFilePath = Path.Combine(jobDirectories.LocalPath, sanitizedFileName);
@@ -338,54 +356,14 @@ public class SongProcessingJob(
         song.AppendLog($"[USDB] Created UltraStar song file: {sanitizedFileName}");
     }
 
-    public static string UpdateUltraStarTxtHeaders(string txtContent, string? audioFileName, string? videoFileName)
+    public static string UpdateUltraStarTxtHeaders(
+        string txtContent,
+        string? audioFileName,
+        string? videoFileName,
+        string? vocalsFileName = null,
+        string? instrumentalFileName = null)
     {
-        var lines = txtContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList();
-        var hasMp3 = false;
-        var hasVideo = false;
-        var headerEndIndex = 0;
-
-        for (int i = 0; i < lines.Count; i++)
-        {
-            var line = lines[i].Trim();
-            if (line.StartsWith('#'))
-            {
-                headerEndIndex = i + 1;
-                if (line.StartsWith("#MP3:", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!string.IsNullOrEmpty(audioFileName))
-                    {
-                        lines[i] = $"#MP3:{audioFileName}";
-                    }
-                    hasMp3 = true;
-                }
-                else if (line.StartsWith("#VIDEO:", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!string.IsNullOrEmpty(videoFileName))
-                    {
-                        lines[i] = $"#VIDEO:{videoFileName}";
-                    }
-                    hasVideo = true;
-                }
-            }
-            else if (line.Length > 0 && ":*FRG-E".Contains(line[0]))
-            {
-                break;
-            }
-        }
-
-        if (!hasMp3 && !string.IsNullOrEmpty(audioFileName))
-        {
-            lines.Insert(headerEndIndex, $"#MP3:{audioFileName}");
-            headerEndIndex++;
-        }
-
-        if (!hasVideo && !string.IsNullOrEmpty(videoFileName))
-        {
-            lines.Insert(headerEndIndex, $"#VIDEO:{videoFileName}");
-        }
-
-        return string.Join(Environment.NewLine, lines);
+        return UltraStarTxtHelper.UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName, vocalsFileName, instrumentalFileName);
     }
 
     /// <summary>

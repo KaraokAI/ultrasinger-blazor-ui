@@ -18,6 +18,12 @@ public partial class YouTubeSearch
     private UsdbService UsdbService { get; set; } = null!;
 
     [Inject]
+    private UsdbDownloadService UsdbDownloadService { get; set; } = null!;
+
+    [Inject]
+    private BlazorSongQueueService SongQueueService { get; set; } = null!;
+
+    [Inject]
     private ProcessorApiClient Processor { get; set; } = null!;
     
     private string SearchQuery { get; set; } = string.Empty;
@@ -76,6 +82,26 @@ public partial class YouTubeSearch
         QueuingSongTitle = result.DisplayTitle;
         FeedbackMessage = null;
         StateHasChanged();
+
+        try
+        {
+            SongQueueService.Enqueue(new SongQueueItem
+            {
+                Title = result.Title,
+                Artist = result.Artist,
+                Source = SongSource.Local,
+                ExtraInfo = result.LocalSong?.Year ?? result.ExtraInfo,
+                FilePath = result.LocalSong?.TxtFilePath,
+                QueuedAt = DateTime.Now
+            });
+
+            FeedbackMessage = $"Queued local song: {result.DisplayTitle}";
+        }
+        finally
+        {
+            QueuingSongTitle = null;
+            StateHasChanged();
+        }
     }
 
     private async Task OnSelectResult(UnifiedSearchResult result)
@@ -94,42 +120,14 @@ public partial class YouTubeSearch
 
             try
             {
-                var details = await UsdbService.GetSongDetailsAsync(result.UsdbSongId.Value);
-                if (details == null || string.IsNullOrWhiteSpace(details.YoutubeUrl))
-                {
-                    FeedbackMessage = "Could not find a YouTube video linked for this USDB song.";
-                    return;
-                }
-
-                var title = !string.IsNullOrWhiteSpace(details.Artist) && !string.IsNullOrWhiteSpace(details.Title)
-                    ? $"{details.Artist} - {details.Title}"
-                    : (result.DisplayTitle);
-
-                var enqueueResult = await Processor.EnqueueAsync(
-                    details.YoutubeUrl,
-                    title,
-                    SongSource.USDB,
-                    details.Id,
-                    details.UltraStarTxt);
-
-                if (enqueueResult == EnqueueResult.Queued)
-                {
-                    HasQueued = true;
-                    Results?.Clear();
-                    FeedbackMessage = $"Queued USDB song: {title}";
-                }
-                else if (enqueueResult == EnqueueResult.Duplicate)
-                {
-                    FeedbackMessage = $"Song is already in queue or processing: {title}";
-                }
-                else
-                {
-                    FeedbackMessage = $"Failed to queue song: {title}";
-                }
+                _ = Task.Run(async () => await UsdbDownloadService.DownloadSongAsync(result.UsdbSongId.Value));
+                HasQueued = true;
+                Results?.Clear();
+                FeedbackMessage = $"Downloading USDB song: {result.DisplayTitle}";
             }
             catch (Exception ex)
             {
-                FeedbackMessage = $"Error queueing USDB song: {ex.Message}";
+                FeedbackMessage = $"Error downloading USDB song: {ex.Message}";
             }
             finally
             {

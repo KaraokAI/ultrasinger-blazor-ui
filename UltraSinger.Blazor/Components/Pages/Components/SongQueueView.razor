@@ -1,0 +1,100 @@
+@using UltraSinger.Contracts
+
+<div class="flex flex-col h-full space-y-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+            <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                <span>🎵 Song Queue</span>
+                <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    @(Items.Count) songs
+                </span>
+            </h2>
+            <p class="text-xs text-slate-400">
+                Informational playlist of queued songs. Add songs from Search or the Library tab.
+            </p>
+        </div>
+        @if (Items.Count > 0)
+        {
+            <div class="flex items-center gap-2">
+                <button @onclick="ClearQueue" class="px-3 py-1.5 text-xs font-semibold rounded bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800 transition flex items-center gap-1.5">
+                    <span>🗑️</span>
+                    <span>Clear Queue</span>
+                </button>
+            </div>
+        }
+    </div>
+
+    <!-- Queue Items -->
+    <div class="flex-grow overflow-y-auto space-y-2 pr-1">
+        @if (Items.Count == 0)
+        {
+            <div class="p-8 text-center text-slate-400 bg-slate-900/50 rounded-lg border border-slate-800">
+                <p class="text-base font-medium">Your song queue is empty.</p>
+                <p class="text-xs text-slate-500 mt-1">Queue songs from the Search tab or Local Library tab, or download new songs!</p>
+            </div>
+        }
+        else
+        {
+            @for (var i = 0; i < Items.Count; i++)
+            {
+                var item = Items[i];
+                var index = i;
+                <div class="flex items-center justify-between p-3 rounded-lg border border-slate-700/80 bg-slate-900/80 hover:bg-slate-800/80 transition">
+                    <div class="flex items-center space-x-3 overflow-hidden flex-grow mr-2">
+                        <span class="w-7 h-7 flex items-center justify-center text-xs font-bold rounded-full bg-slate-800 text-slate-300 border border-slate-700 flex-shrink-0">
+                            @(index + 1)
+                        </span>
+
+                        <div class="overflow-hidden">
+                            <div class="flex items-center space-x-2">
+                                @if (item.Source == SongSource.Local)
+                                {
+                                    <span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 text-emerald-100">LOCAL</span>
+                                }
+                                else if (item.Source == SongSource.USDB)
+                                {
+                                    <span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-700 text-blue-100">USDB</span>
+                                }
+                                else
+                                {
+                                    <span class="px-2 py-0.5 text-xs font-bold rounded bg-red-700 text-red-100">YouTube</span>
+                                }
+
+                                <strong class="text-slate-100 truncate">
+                                    @item.DisplayTitle
+                                </strong>
+                            </div>
+
+                            <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                                <span>Queued: @item.QueuedAt.ToString("HH:mm:ss")</span>
+                                @if (!string.IsNullOrWhiteSpace(item.ExtraInfo))
+                                {
+                                    <span>•</span>
+                                    <span>@item.ExtraInfo</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-shrink-0 flex items-center gap-1">
+                        <button @onclick="() => MoveUp(item.Id)" disabled="@(index == 0)"
+                                class="p-1.5 text-xs rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition"
+                                title="Move Up">
+                            ▲
+                        </button>
+                        <button @onclick="() => MoveDown(item.Id)" disabled="@(index == Items.Count - 1)"
+                                class="p-1.5 text-xs rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 border border-slate-700 transition"
+                                title="Move Down">
+                            ▼
+                        </button>
+                        <button @onclick="() => Remove(item.Id)"
+                                class="p-1.5 text-xs rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/80 transition ml-1"
+                                title="Remove from Queue">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
