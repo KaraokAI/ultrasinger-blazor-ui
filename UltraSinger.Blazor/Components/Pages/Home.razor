@@ -27,20 +27,7 @@
                     <span>📥</span>
                     <span>Downloads & Logs</span>
                 </button>
-                <button @onclick="() => SetActiveTab(TabType.GameQueue)"
-                        class="px-3 py-1.5 text-xs font-semibold rounded-md transition flex items-center gap-1.5 @(ActiveTab == TabType.GameQueue ? "bg-indigo-600 text-white shadow" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60")">
-                    <span>🎮</span>
-                    <span>Game Queue</span>
-                </button>
             </nav>
-        </div>
-
-        <div class="flex items-center gap-2">
-            <GameStatusBadge OnClick="() => SetActiveTab(TabType.GameQueue)" />
-            <button @onclick="ToggleAddModal" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1 shadow">
-                <span>➕</span>
-                <span>Direct Link</span>
-            </button>
         </div>
     </header>
 
@@ -98,35 +85,6 @@
                     </div>
                 </div>
                 break;
-
-            case TabType.GameQueue:
-                <div class="h-full min-h-0">
-                    <GameQueueView />
-                </div>
-                break;
         }
     </main>
 </div>
-
-@code {
-    private enum TabType
-    {
-        Search,
-        Library,
-        Downloads,
-        GameQueue
-    }
-
-    private TabType ActiveTab { get; set; } = TabType.Search;
-    private bool ShowAddModal { get; set; } = false;
-
-    private void SetActiveTab(TabType tab)
-    {
-        ActiveTab = tab;
-    }
-
-    private void ToggleAddModal()
-    {
-        ShowAddModal = !ShowAddModal;
-    }
-}

@@ -43,11 +43,6 @@ builder.Services.AddHttpClient<ProcessorApiClient>(client =>
     }
 });
 
-builder.Services.AddHttpClient<IUltraStarPlayService, UltraStarPlayService>(client =>
-{
-    client.Timeout = TimeSpan.FromSeconds(10);
-});
-
 builder.Services.AddScoped<YouTubeAPIService>();
 builder.Services.AddSingleton<UsdbService>();
 builder.Services.AddSingleton<LocalLibraryService>();

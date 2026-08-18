@@ -19,10 +19,7 @@ public partial class YouTubeSearch
 
     [Inject]
     private ProcessorApiClient Processor { get; set; } = null!;
-
-    [Inject]
-    private IUltraStarPlayService UltraStarPlayService { get; set; } = null!;
-
+    
     private string SearchQuery { get; set; } = string.Empty;
     private bool IsLoading { get; set; } = false;
     private bool HasQueued { get; set; } = false;
@@ -79,32 +76,6 @@ public partial class YouTubeSearch
         QueuingSongTitle = result.DisplayTitle;
         FeedbackMessage = null;
         StateHasChanged();
-
-        try
-        {
-            var success = await UltraStarPlayService.EnqueueSongAsync(
-                result.Artist,
-                result.Title,
-                result.LocalSong?.TxtFilePath);
-
-            if (success)
-            {
-                FeedbackMessage = $"🎮 Enqueued '{result.DisplayTitle}' in UltraStar Play!";
-            }
-            else
-            {
-                FeedbackMessage = $"Could not queue '{result.DisplayTitle}' in UltraStar Play. Ensure the game is running.";
-            }
-        }
-        catch (Exception ex)
-        {
-            FeedbackMessage = $"Error queueing in game: {ex.Message}";
-        }
-        finally
-        {
-            QueuingSongTitle = null;
-            StateHasChanged();
-        }
     }
 
     private async Task OnSelectResult(UnifiedSearchResult result)

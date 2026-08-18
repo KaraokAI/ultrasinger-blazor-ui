@@ -18,7 +18,6 @@ public class BundleFetchService(
     ProcessorApiClient processor,
     IOptionsMonitor<LibraryConfiguration> options,
     IOptionsMonitor<UltraStarPlayConfiguration> uspOptions,
-    IUltraStarPlayService ultraStarPlayService,
     LocalLibraryService localLibraryService,
     ILogger<BundleFetchService> logger) : BackgroundService
 {
@@ -141,20 +140,6 @@ public class BundleFetchService(
                     var parts = title.Split(" - ", 2);
                     artist = parts[0].Trim();
                     title = parts[1].Trim();
-                }
-
-                if (!string.IsNullOrWhiteSpace(title))
-                {
-                    logger.LogInformation("Auto-queueing newly downloaded song '{Artist} - {Title}' to UltraStar Play...", artist, title);
-                    var queued = await ultraStarPlayService.EnqueueSongAsync(artist, title, extractedTxtPath, cancellationToken: cancellationToken);
-                    if (queued)
-                    {
-                        logger.LogInformation("Successfully auto-queued song '{Artist} - {Title}' in UltraStar Play.", artist, title);
-                    }
-                    else
-                    {
-                        logger.LogWarning("Could not auto-queue '{Artist} - {Title}' in UltraStar Play (is the game running?).", artist, title);
-                    }
                 }
             }
             catch (Exception ex)

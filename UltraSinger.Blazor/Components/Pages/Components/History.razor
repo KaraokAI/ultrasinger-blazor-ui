@@ -70,19 +70,8 @@
                         <div class="flex items-center gap-2 flex-shrink-0">
                             @if (song.State == SongState.COMPLETED)
                             {
-                                <button @onclick="() => QueueInGameAsync(song)"
-                                        disabled="@(QueuingSongId == song.Id)"
-                                        class="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-800/80 hover:bg-emerald-700 disabled:opacity-50 text-emerald-100 border border-emerald-700 transition flex items-center gap-1 shadow-sm">
-                                    @if (QueuingSongId == song.Id)
-                                    {
-                                        <span class="animate-spin">⏳</span>
-                                        <span>Queuing...</span>
-                                    }
-                                    else
-                                    {
-                                        <span>🎮 Queue</span>
-                                    }
-                                </button>
+                                <span class="animate-spin">🎤</span>
+                                <span>Ready to sing</span>
                             }
                         </div>
                     </li>

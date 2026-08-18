@@ -1,7 +1,6 @@
 @using UltraSinger.Blazor.Services
 @using UltraSinger.Contracts
 @inject LocalLibraryService LocalLibraryService
-@inject IUltraStarPlayService UltraStarPlayService
 
 <div class="flex flex-col h-full space-y-4">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -110,107 +109,8 @@
                             }
                         </div>
                     </div>
-
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <button @onclick="() => QueueInGameAsync(song)"
-                                disabled="@(QueuingSongPath == song.TxtFilePath)"
-                                class="px-3 py-1.5 text-xs font-semibold rounded bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 disabled:opacity-50 text-white transition flex items-center gap-1.5 shadow-sm">
-                            @if (QueuingSongPath == song.TxtFilePath)
-                            {
-                                <span class="animate-spin">⏳</span>
-                                <span>Queuing...</span>
-                            }
-                            else
-                            {
-                                <span>🎮</span>
-                                <span>Queue in Game</span>
-                            }
-                        </button>
-                    </div>
                 </div>
             }
         }
     </div>
 </div>
-
-@code {
-    private string SearchQuery { get; set; } = string.Empty;
-    private List<LocalSongResult> FilteredSongs { get; set; } = new();
-    private bool IsRefreshing { get; set; } = false;
-    private string? FeedbackMessage { get; set; }
-    private bool IsFeedbackError { get; set; }
-    private string? QueuingSongPath { get; set; }
-
-    protected override void OnInitialized()
-    {
-        ApplyFilter();
-    }
-
-    private void ApplyFilter()
-    {
-        FilteredSongs = LocalLibraryService.Search(SearchQuery);
-    }
-
-    private void ClearSearch()
-    {
-        SearchQuery = string.Empty;
-        ApplyFilter();
-    }
-
-    private void RefreshLibrary()
-    {
-        IsRefreshing = true;
-        try
-        {
-            LocalLibraryService.Refresh();
-            ApplyFilter();
-            FeedbackMessage = $"Library refreshed: {FilteredSongs.Count} songs found.";
-            IsFeedbackError = false;
-        }
-        catch (Exception ex)
-        {
-            FeedbackMessage = $"Failed to scan library: {ex.Message}";
-            IsFeedbackError = true;
-        }
-        finally
-        {
-            IsRefreshing = false;
-        }
-    }
-
-    private async Task QueueInGameAsync(LocalSongResult song)
-    {
-        QueuingSongPath = song.TxtFilePath;
-        FeedbackMessage = null;
-        StateHasChanged();
-
-        try
-        {
-            var success = await UltraStarPlayService.EnqueueSongAsync(
-                song.Artist,
-                song.Title,
-                song.TxtFilePath);
-
-            if (success)
-            {
-                FeedbackMessage = $"🎮 Enqueued '{song.Artist} - {song.Title}' in UltraStar Play!";
-                IsFeedbackError = false;
-            }
-            else
-            {
-                FeedbackMessage = $"Could not queue '{song.Artist} - {song.Title}' in UltraStar Play. Ensure the game is running.";
-                IsFeedbackError = true;
-            }
-        }
-        catch (Exception ex)
-        {
-            FeedbackMessage = $"Error: {ex.Message}";
-            IsFeedbackError = true;
-        }
-        finally
-        {
-            QueuingSongPath = null;
-            StateHasChanged();
-        }
-    }
-}
