@@ -16,6 +16,8 @@ builder.Services
     .AddSingleton<SongDatabase>()
     .AddSingleton<SqliteSongStore>()
     .AddSingleton<ISongStore>(provider => provider.GetRequiredService<SqliteSongStore>())
+    .AddSingleton<PlayQueueDatabase>()
+    .AddSingleton<PlayQueueStore>()
     .AddScoped<YoutubeMetadataService>()
     .AddScoped<YTDLPService>()
     .AddScoped<SyncedLyricsService>()
@@ -68,6 +70,7 @@ logger.LogInformation("Configuration validated");
 
 // Load persisted songs (and fail any that were mid-flight last time) before serving traffic.
 app.Services.GetRequiredService<SqliteSongStore>().Load();
+app.Services.GetRequiredService<PlayQueueStore>().Load();
 
 if (!app.Environment.IsDevelopment())
 {

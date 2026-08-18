@@ -36,6 +36,18 @@ public partial class SongQueueView : ComponentBase, IDisposable
         SongQueueService.Remove(id);
     }
 
+    private void ToggleSung(SongQueueItem item)
+    {
+        if (item.IsSung)
+        {
+            SongQueueService.UnmarkSung(item.Id);
+        }
+        else
+        {
+            SongQueueService.MarkSung(item.Id);
+        }
+    }
+
     private void ClearQueue()
     {
         SongQueueService.Clear();

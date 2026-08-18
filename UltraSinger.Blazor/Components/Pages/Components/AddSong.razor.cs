@@ -13,9 +13,6 @@ public partial class AddSong : ComponentBase
     [Inject]
     private UsdbService UsdbService { get; set; } = null!;
 
-    [Inject]
-    private UsdbDownloadService UsdbDownloadService { get; set; } = null!;
-
     private string? SongUrl { get; set; }
 
     private bool IsAdding { get; set; }
@@ -57,7 +54,11 @@ public partial class AddSong : ComponentBase
                 var idStr = !string.IsNullOrEmpty(usdbMatch.Groups[1].Value) ? usdbMatch.Groups[1].Value : usdbMatch.Groups[2].Value;
                 if (int.TryParse(idStr, out var songId))
                 {
-                    _ = Task.Run(async () => await UsdbDownloadService.DownloadSongAsync(songId));
+                    var request = await UsdbService.TryBuildEnqueueRequestAsync(songId);
+                    if (request != null)
+                    {
+                        await Processor.EnqueueAsync(request);
+                    }
                     SongUrl = string.Empty;
                     return;
                 }

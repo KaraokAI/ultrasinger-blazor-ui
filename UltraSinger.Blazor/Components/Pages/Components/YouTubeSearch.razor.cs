@@ -18,9 +18,6 @@ public partial class YouTubeSearch
     private UsdbService UsdbService { get; set; } = null!;
 
     [Inject]
-    private UsdbDownloadService UsdbDownloadService { get; set; } = null!;
-
-    [Inject]
     private BlazorSongQueueService SongQueueService { get; set; } = null!;
 
     [Inject]
@@ -120,14 +117,34 @@ public partial class YouTubeSearch
 
             try
             {
-                _ = Task.Run(async () => await UsdbDownloadService.DownloadSongAsync(result.UsdbSongId.Value));
-                HasQueued = true;
-                Results?.Clear();
-                FeedbackMessage = $"Downloading USDB song: {result.DisplayTitle}";
+                var request = await UsdbService.TryBuildEnqueueRequestAsync(result.UsdbSongId.Value);
+                if (request == null)
+                {
+                    FeedbackMessage = $"Could not fetch USDB details for: {result.DisplayTitle}";
+                }
+                else
+                {
+                    var enqueueResult = await Processor.EnqueueAsync(request);
+
+                    if (enqueueResult == EnqueueResult.Queued)
+                    {
+                        HasQueued = true;
+                        Results?.Clear();
+                        FeedbackMessage = $"Queued USDB song: {result.DisplayTitle}";
+                    }
+                    else if (enqueueResult == EnqueueResult.Duplicate)
+                    {
+                        FeedbackMessage = $"Song is already in queue or processing: {result.DisplayTitle}";
+                    }
+                    else
+                    {
+                        FeedbackMessage = $"Failed to queue song: {result.DisplayTitle}";
+                    }
+                }
             }
             catch (Exception ex)
             {
-                FeedbackMessage = $"Error downloading USDB song: {ex.Message}";
+                FeedbackMessage = $"Error queuing USDB song: {ex.Message}";
             }
             finally
             {
