@@ -1,9 +1,61 @@
-﻿@inherits LayoutComponentBase
+﻿@using UltraSinger.Blazor.Components.Pages.Components
+@inherits LayoutComponentBase
 
 <div class="page h-full w-full">
     <main class="h-full w-full">
         <article class="content px-4 flex h-full w-full">
-            @Body
+            <ProcessorStatus/>
+
+            <div class="flex flex-col h-full w-full dark text-slate-100 mic-backdrop">
+                <!-- Top Navigation / Subview Tabs Bar -->
+                <header class="flex flex-col sm:flex-row justify-between px-3 mb-3">
+                    <div class="w-full flex flex-row items-center justify-center gap-3">
+                        <nav class="flex gap-6 bg-slate-950/80 p-1 text-lg rounded-lg border border-slate-800">
+                            <NavLink ActiveClass="border border-1 rounded-md" href="@RouteConstants.Search" Match="NavLinkMatch.All">
+                                <div class="px-3 py-1.5 font-semibold rounded-md transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60">
+                                    <span>🔍</span>
+                                    <span>Search & Add</span>
+                                </div>
+                            </NavLink>
+                            
+                            <NavLink ActiveClass="border border-1 rounded-md" href="@RouteConstants.LocalLibrary">
+                                <div class="px-3 py-1.5 font-semibold rounded-md transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 active:bg-indigo-600">
+                                    <span>📚</span>
+                                    <span>Song Library</span>
+                                </div>
+                            </NavLink>
+                            
+                            <NavLink ActiveClass="border border-1 rounded-md" href="@RouteConstants.SingQueue">
+                                <div class="px-3 py-1.5 font-semibold rounded-md transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 active:bg-indigo-600">
+                                    <span>😍</span>
+                                    <span>Sing Queue</span>
+                                    @if (SongQueueService.ActiveCount > 0)
+                                    {
+                                        <span class="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-pink-500 text-white">
+                                            @SongQueueService.ActiveCount
+                                        </span>
+                                    }
+                                </div>
+                            </NavLink>
+                            
+                            <NavLink ActiveClass="border border-1 rounded-md" href="@RouteConstants.Logs">
+                                <div class="px-3 py-1.5 font-semibold rounded-md transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 active:bg-indigo-600">
+                                    <span>📥</span>
+                                    <span>Logs</span>
+                                </div>
+                            </NavLink>
+                        </nav>
+                        <div class="flex-grow"></div>
+                        <h1 class="text-[70px] font-bold logo-font text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 flex items-center gap-2">
+                            <span>Voice Box</span>
+                        </h1>
+                    </div>
+                </header>
+                
+                <main class="flex-grow min-h-0 overflow-hidden flex flex-col p-2">
+                    @Body
+                </main>
+            </div>
         </article>
     </main>
 </div>

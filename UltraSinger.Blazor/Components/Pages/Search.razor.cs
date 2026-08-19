@@ -3,7 +3,7 @@ using UltraSinger.Blazor.Services;
 
 namespace UltraSinger.Blazor.Components.Pages;
 
-public partial class Home : ComponentBase, IDisposable
+public partial class Search : IDisposable
 {
     private enum TabType
     {
@@ -12,10 +12,7 @@ public partial class Home : ComponentBase, IDisposable
         Queue,
         Downloads
     }
-
-    [Inject]
-    private BlazorSongQueueService SongQueueService { get; set; } = null!;
-
+    
     private TabType ActiveTab { get; set; } = TabType.Search;
     private bool ShowAddModal { get; set; } = false;
 

@@ -6,7 +6,7 @@ namespace UltraSinger.Blazor.Services;
 /// Client-side cache of the processor's "sing next" play queue (see
 /// <c>PlayQueueController</c>/<c>PlayQueueStore</c>). Polls the processor on a timer so the
 /// queue survives a processor restart, while keeping the same synchronous-looking surface
-/// (<see cref="Items"/>, <see cref="Count"/>, <see cref="OnQueueChanged"/>, and the mutation
+/// (<see cref="Items"/>, <see cref="ActiveCount"/>, <see cref="OnQueueChanged"/>, and the mutation
 /// methods) that callers already use from Razor <c>@onclick</c> handlers.
 /// </summary>
 public class BlazorSongQueueService(ProcessorApiClient processor, ILogger<BlazorSongQueueService> logger) : BackgroundService
@@ -23,9 +23,9 @@ public class BlazorSongQueueService(ProcessorApiClient processor, ILogger<Blazor
         get { lock (_lock) { return _items; } }
     }
 
-    public int Count
+    public int ActiveCount
     {
-        get { lock (_lock) { return _items.Count; } }
+        get { lock (_lock) { return _items.Count(x => x.SungAt == null); } }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
