@@ -1,0 +1,26 @@
+@attribute [Route(RouteConstants.Search)]
+@using UltraSinger.Blazor.Components.Pages.Components
+
+@inherits LibraryBase
+
+@if (ShowAddModal)
+{
+    <div class="mb-3 p-3 bg-slate-900/95 rounded-lg border border-indigo-500/50 shadow-lg flex flex-col gap-2">
+        <div class="flex justify-between items-center text-xs text-slate-300">
+            <span class="font-semibold">Add Song by Direct Link or USDB ID:</span>
+            <button @onclick="ToggleAddModal" class="text-slate-400 hover:text-slate-200">✕ Close</button>
+        </div>
+        <AddSong />
+    </div>
+}
+
+<div class="flex flex-col lg:flex-row h-full gap-4">
+    <div class="w-full lg:w-3/5 h-full flex flex-col min-h-0">
+        <YouTubeSearch />
+    </div>
+    <div class="w-full lg:w-2/5 h-full flex flex-col min-h-0 border-t lg:border-t-0 lg:border-l border-slate-800 pt-4 lg:pt-0 lg:pl-4">
+        <div class="h-full min-h-0 mb-3">
+            <History />
+        </div>
+    </div>
+</div>

@@ -6,7 +6,7 @@
             <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
                 <span>🎵 Song Queue</span>
                 <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-                    @(Items.Count) songs
+                    @(Items.Count(x => x.SungAt == null)) songs
                 </span>
             </h2>
             <p class="text-xs text-slate-400">
