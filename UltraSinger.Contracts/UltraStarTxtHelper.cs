@@ -7,13 +7,15 @@ public static class UltraStarTxtHelper
         string? audioFileName,
         string? videoFileName,
         string? vocalsFileName = null,
-        string? instrumentalFileName = null)
+        string? instrumentalFileName = null,
+        string? coverFileName = null)
     {
         var lines = txtContent.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None).ToList();
         var hasMp3 = false;
         var hasVideo = false;
         var hasVocals = false;
         var hasInstrumental = false;
+        var hasCover = false;
         var headerEndIndex = 0;
 
         for (int i = 0; i < lines.Count; i++)
@@ -54,6 +56,14 @@ public static class UltraStarTxtHelper
                     }
                     hasInstrumental = true;
                 }
+                else if (line.StartsWith("#COVER:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrEmpty(coverFileName))
+                    {
+                        lines[i] = $"#COVER:{coverFileName}";
+                    }
+                    hasCover = true;
+                }
             }
             else if (line.Length > 0 && ":*FRG-E".Contains(line[0]))
             {
@@ -82,6 +92,12 @@ public static class UltraStarTxtHelper
         if (!hasInstrumental && !string.IsNullOrEmpty(instrumentalFileName))
         {
             lines.Insert(headerEndIndex, $"#INSTRUMENTAL:{instrumentalFileName}");
+            headerEndIndex++;
+        }
+
+        if (!hasCover && !string.IsNullOrEmpty(coverFileName))
+        {
+            lines.Insert(headerEndIndex, $"#COVER:{coverFileName}");
         }
 
         return string.Join(Environment.NewLine, lines);

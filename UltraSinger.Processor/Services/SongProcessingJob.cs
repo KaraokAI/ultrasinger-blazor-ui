@@ -33,6 +33,8 @@ public class SongProcessingJob(
 
     private static readonly Regex AnsiColourCodeRegex = new(@"\[[0-9]{1,2}m", RegexOptions.Compiled);
 
+    private static readonly HttpClient CoverHttpClient = new();
+
     public async Task ProcessAsync(Guid songId)
     {
         var song = store.Get(songId);
@@ -359,6 +361,13 @@ public class SongProcessingJob(
             videoFileName = await EnsureH264Async(song, songDirectories.LocalPath, videoFileName);
         }
 
+        string? coverFileName = null;
+
+        if (song.UsdbSongId is { } usdbSongId)
+        {
+            coverFileName = await DownloadCoverAsync(song, songDirectories.LocalPath, usdbSongId);
+        }
+
         string? vocalsFileName = null;
         string? instrumentalFileName = null;
 
@@ -387,6 +396,7 @@ public class SongProcessingJob(
         videoFileName = RenameToTitledFile(songDirectories.LocalPath, videoFileName, sanitizedBaseTitle);
         vocalsFileName = RenameToTitledFile(songDirectories.LocalPath, vocalsFileName, sanitizedBaseTitle, " [Vocals]");
         instrumentalFileName = RenameToTitledFile(songDirectories.LocalPath, instrumentalFileName, sanitizedBaseTitle, " [Instrumental]");
+        coverFileName = RenameToTitledFile(songDirectories.LocalPath, coverFileName, sanitizedBaseTitle, " [Cover]");
 
         // Once vocals/instrumental exist, the full mix is redundant background noise for the
         // client bundle - the instrumental is what UltraStar Deluxe should actually play back.
@@ -394,7 +404,7 @@ public class SongProcessingJob(
         var mp3FileName = hasSeparatedStems ? instrumentalFileName : audioFileName;
 
         var txtContent = song.UltraStarTxt ?? string.Empty;
-        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, mp3FileName, videoFileName, vocalsFileName, instrumentalFileName);
+        var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, mp3FileName, videoFileName, vocalsFileName, instrumentalFileName, coverFileName);
 
         var sanitizedFileName = sanitizedBaseTitle + ".txt";
         var txtFilePath = Path.Combine(songDirectories.LocalPath, sanitizedFileName);
@@ -407,7 +417,7 @@ public class SongProcessingJob(
         // Only the files actually referenced by the .txt (plus the .txt itself) should reach
         // the client - not the full mix once it's superseded, and not any other yt-dlp/demucs
         // leftovers.
-        var filesToKeep = new[] { mp3FileName, videoFileName, hasSeparatedStems ? vocalsFileName : null, sanitizedFileName }
+        var filesToKeep = new[] { mp3FileName, videoFileName, hasSeparatedStems ? vocalsFileName : null, coverFileName, sanitizedFileName }
             .Where(f => f != null)
             .Select(f => f!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -418,6 +428,44 @@ public class SongProcessingJob(
             {
                 File.Delete(file);
             }
+        }
+    }
+
+    /// <summary>
+    /// USDB hosts each song's cover at a fixed, predictable URL keyed by the USDB song id -
+    /// the same convention UltraSinger.py already relies on for YouTube-sourced songs. A
+    /// missing cover (song has none, or a network hiccup) just means no #COVER header; it
+    /// isn't worth failing the whole job over.
+    /// </summary>
+    private async Task<string?> DownloadCoverAsync(SongRecord song, string localDir, int usdbSongId)
+    {
+        var coverUrl = $"https://usdb.animux.de/data/cover/{usdbSongId}.jpg";
+
+        try
+        {
+            using var response = await CoverHttpClient.GetAsync(coverUrl);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                song.AppendLog($"[USDB] No cover available at {coverUrl} ({(int)response.StatusCode}).");
+                return null;
+            }
+
+            const string coverFileName = "cover.jpg";
+            var coverPath = Path.Combine(localDir, coverFileName);
+
+            await using var fileStream = File.Create(coverPath);
+            await response.Content.CopyToAsync(fileStream);
+
+            song.AppendLog("[USDB] Downloaded cover image.");
+
+            return coverFileName;
+        }
+        catch (Exception ex)
+        {
+            song.AppendLog($"[USDB] Failed to download cover: {ex.Message}");
+            logger.LogWarning(ex, "Failed to download USDB cover for song {SongId}", song.Id);
+            return null;
         }
     }
 
@@ -501,9 +549,10 @@ public class SongProcessingJob(
         string? audioFileName,
         string? videoFileName,
         string? vocalsFileName = null,
-        string? instrumentalFileName = null)
+        string? instrumentalFileName = null,
+        string? coverFileName = null)
     {
-        return UltraStarTxtHelper.UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName, vocalsFileName, instrumentalFileName);
+        return UltraStarTxtHelper.UpdateUltraStarTxtHeaders(txtContent, audioFileName, videoFileName, vocalsFileName, instrumentalFileName, coverFileName);
     }
 
     /// <summary>
