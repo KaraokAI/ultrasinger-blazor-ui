@@ -1,0 +1,605 @@
+# pip fallback for environments without uv. Generated from uv.lock - regenerate with:
+#   uv export --no-hashes --no-emit-project -o requirements.txt
+# then re-add the index line below. Install from this directory: pip install -r requirements.txt
+--extra-index-url https://download.pytorch.org/whl/cu128
+../UltraSinger ; sys_platform == 'linux'
+    # via ultrasinger-processor-tools
+aiohappyeyeballs==2.6.1 ; sys_platform == 'linux'
+    # via aiohttp
+aiohttp==3.13.3 ; sys_platform == 'linux'
+    # via fsspec
+aiosignal==1.4.0 ; sys_platform == 'linux'
+    # via aiohttp
+alembic==1.18.4 ; sys_platform == 'linux'
+    # via optuna
+antlr4-python3-runtime==4.9.3 ; sys_platform == 'linux'
+    # via omegaconf
+appdirs==1.4.4 ; sys_platform == 'linux'
+    # via pyhyphen
+asteroid-filterbanks==0.4.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+attrs==25.4.0 ; sys_platform == 'linux'
+    # via aiohttp
+audioread==3.1.0 ; sys_platform == 'linux'
+    # via librosa
+av==16.1.0 ; sys_platform == 'linux'
+    # via faster-whisper
+beautifulsoup4==4.15.0 ; sys_platform == 'linux'
+    # via syncedlyrics
+brotli==1.2.1 ; implementation_name == 'cpython' and sys_platform == 'linux'
+    # via yt-dlp
+brotlicffi==1.2.0.1 ; implementation_name != 'cpython' and sys_platform == 'linux'
+    # via yt-dlp
+certifi==2026.11.20 ; sys_platform == 'linux'
+    # via
+    #   requests
+    #   yt-dlp
+cffi==2.0.0 ; sys_platform == 'linux'
+    # via
+    #   brotlicffi
+    #   soundfile
+chardet==5.2.0 ; sys_platform == 'linux'
+    # via
+    #   music21
+    #   ultrasinger
+charset-normalizer==3.4.4 ; sys_platform == 'linux'
+    # via requests
+click==8.3.1 ; sys_platform == 'linux'
+    # via nltk
+cloudpickle==3.1.2 ; sys_platform == 'linux'
+    # via submitit
+colorlog==6.10.1 ; sys_platform == 'linux'
+    # via optuna
+contourpy==1.3.3 ; sys_platform == 'linux'
+    # via matplotlib
+ctranslate2==4.7.1 ; sys_platform == 'linux'
+    # via
+    #   faster-whisper
+    #   whisperx
+cycler==0.12.1 ; sys_platform == 'linux'
+    # via matplotlib
+dataclasses==0.8 ; sys_platform == 'linux'
+    # via ultrasinger
+dataclasses-json==0.6.7 ; sys_platform == 'linux'
+    # via ultrasinger
+decorator==5.2.1 ; sys_platform == 'linux'
+    # via librosa
+demucs==4.0.1 ; sys_platform == 'linux'
+    # via ultrasinger
+deno==2.9.8 ; sys_platform == 'linux'
+    # via ultrasinger
+docopt==0.6.2 ; sys_platform == 'linux'
+    # via num2words
+dora-search==0.1.12 ; sys_platform == 'linux'
+    # via demucs
+einops==0.8.2 ; sys_platform == 'linux'
+    # via
+    #   demucs
+    #   pyannote-audio
+faster-whisper==1.2.1 ; sys_platform == 'linux'
+    # via whisperx
+ffmpeg-python==0.2.0 ; sys_platform == 'linux'
+    # via ultrasinger
+filelock==3.24.3 ; sys_platform == 'linux'
+    # via
+    #   huggingface-hub
+    #   pyannote-pipeline
+    #   torch
+    #   transformers
+flatbuffers==25.12.19 ; sys_platform == 'linux'
+    # via onnxruntime
+fonttools==4.61.1 ; sys_platform == 'linux'
+    # via matplotlib
+frozenlist==1.8.0 ; sys_platform == 'linux'
+    # via
+    #   aiohttp
+    #   aiosignal
+fsspec==2026.2.0 ; sys_platform == 'linux'
+    # via
+    #   huggingface-hub
+    #   lightning
+    #   pytorch-lightning
+    #   torch
+future==1.0.0 ; sys_platform == 'linux'
+    # via ffmpeg-python
+googleapis-common-protos==1.72.0 ; sys_platform == 'linux'
+    # via
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+greenlet==3.3.2 ; (platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64') and sys_platform == 'linux'
+    # via sqlalchemy
+grpcio==1.78.1 ; sys_platform == 'linux'
+    # via opentelemetry-exporter-otlp-proto-grpc
+hf-xet==1.3.0 ; (platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64') and sys_platform == 'linux'
+    # via huggingface-hub
+huggingface-hub==0.36.2 ; sys_platform == 'linux'
+    # via
+    #   faster-whisper
+    #   pyannote-audio
+    #   tokenizers
+    #   transformers
+    #   whisperx
+idna==3.11 ; sys_platform == 'linux'
+    # via
+    #   requests
+    #   yarl
+importlib-metadata==8.7.1 ; sys_platform == 'linux'
+    # via opentelemetry-api
+importlib-resources==6.5.2 ; sys_platform == 'linux'
+    # via pretty-midi
+inputimeout==1.0.4 ; sys_platform == 'linux'
+    # via ultrasinger
+jinja2==3.1.6 ; sys_platform == 'linux'
+    # via torch
+joblib==1.5.3 ; sys_platform == 'linux'
+    # via
+    #   librosa
+    #   music21
+    #   nltk
+    #   scikit-learn
+jsonpickle==4.1.1 ; sys_platform == 'linux'
+    # via music21
+julius==0.2.7 ; sys_platform == 'linux'
+    # via
+    #   demucs
+    #   torch-audiomentations
+kiwisolver==1.4.9 ; sys_platform == 'linux'
+    # via matplotlib
+lameenc==1.8.1 ; sys_platform == 'linux'
+    # via demucs
+langcodes==3.5.1 ; sys_platform == 'linux'
+    # via ultrasinger
+language-data==1.4.0 ; sys_platform == 'linux'
+    # via ultrasinger
+lazy-loader==0.4 ; sys_platform == 'linux'
+    # via librosa
+levenshtein==0.27.3 ; sys_platform == 'linux'
+    # via python-levenshtein
+librosa==0.11.0 ; sys_platform == 'linux'
+    # via ultrasinger
+lightning==2.6.1 ; sys_platform == 'linux'
+    # via pyannote-audio
+lightning-utilities==0.15.3 ; sys_platform == 'linux'
+    # via
+    #   lightning
+    #   pytorch-lightning
+    #   torchmetrics
+llvmlite==0.46.0 ; sys_platform == 'linux'
+    # via numba
+mako==1.3.10 ; sys_platform == 'linux'
+    # via alembic
+marisa-trie==1.3.1 ; sys_platform == 'linux'
+    # via language-data
+markdown-it-py==4.0.0 ; sys_platform == 'linux'
+    # via rich
+markupsafe==3.0.3 ; sys_platform == 'linux'
+    # via
+    #   jinja2
+    #   mako
+marshmallow==3.26.2 ; sys_platform == 'linux'
+    # via dataclasses-json
+matplotlib==3.10.8 ; sys_platform == 'linux'
+    # via
+    #   music21
+    #   pyannote-audio
+    #   ultrasinger
+mdurl==0.1.2 ; sys_platform == 'linux'
+    # via markdown-it-py
+mido==1.3.3 ; sys_platform == 'linux'
+    # via pretty-midi
+more-itertools==10.8.0 ; sys_platform == 'linux'
+    # via music21
+mpmath==1.3.0 ; sys_platform == 'linux'
+    # via sympy
+msgpack==1.1.2 ; sys_platform == 'linux'
+    # via librosa
+multidict==6.7.1 ; sys_platform == 'linux'
+    # via
+    #   aiohttp
+    #   yarl
+music21==9.9.1 ; sys_platform == 'linux'
+    # via ultrasinger
+musicbrainzngs==0.7.1 ; sys_platform == 'linux'
+    # via ultrasinger
+mutagen==1.48.1 ; sys_platform == 'linux'
+    # via yt-dlp
+mypy-extensions==1.1.0 ; sys_platform == 'linux'
+    # via typing-inspect
+networkx==3.6.1 ; sys_platform == 'linux'
+    # via torch
+nltk==3.9.3 ; sys_platform == 'linux'
+    # via whisperx
+num2words==0.5.14 ; sys_platform == 'linux'
+    # via ultrasinger
+numba==0.64.0 ; sys_platform == 'linux'
+    # via librosa
+numpy==2.4.2 ; sys_platform == 'linux'
+    # via
+    #   asteroid-filterbanks
+    #   contourpy
+    #   ctranslate2
+    #   librosa
+    #   matplotlib
+    #   music21
+    #   numba
+    #   onnxruntime
+    #   openunmix
+    #   optuna
+    #   pandas
+    #   pretty-midi
+    #   pyannote-core
+    #   pyannote-metrics
+    #   pytorch-metric-learning
+    #   scikit-learn
+    #   scipy
+    #   soundfile
+    #   soxr
+    #   swift-f0
+    #   torchmetrics
+    #   torchvision
+    #   transformers
+    #   whisperx
+nvidia-cublas-cu12==12.8.4.1 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via
+    #   nvidia-cudnn-cu12
+    #   nvidia-cusolver-cu12
+    #   torch
+nvidia-cuda-cupti-cu12==12.8.90 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cuda-nvrtc-cu12==12.8.93 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cuda-runtime-cu12==12.8.90 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cudnn-cu12==9.10.2.21 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cufft-cu12==11.3.3.83 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cufile-cu12==1.13.1.3 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-curand-cu12==10.3.9.90 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cusolver-cu12==11.7.3.90 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-cusparse-cu12==12.5.8.93 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via
+    #   nvidia-cusolver-cu12
+    #   torch
+nvidia-cusparselt-cu12==0.7.1 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-nccl-cu12==2.27.3 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+nvidia-nvjitlink-cu12==12.8.93 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via
+    #   nvidia-cufft-cu12
+    #   nvidia-cusolver-cu12
+    #   nvidia-cusparse-cu12
+    #   torch
+nvidia-nvtx-cu12==12.8.90 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via torch
+omegaconf==2.3.0 ; sys_platform == 'linux'
+    # via
+    #   dora-search
+    #   whisperx
+onnxruntime==1.24.2 ; sys_platform == 'linux'
+    # via
+    #   faster-whisper
+    #   swift-f0
+opentelemetry-api==1.39.1 ; sys_platform == 'linux'
+    # via
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+    #   pyannote-audio
+opentelemetry-exporter-otlp==1.39.1 ; sys_platform == 'linux'
+    # via pyannote-audio
+opentelemetry-exporter-otlp-proto-common==1.39.1 ; sys_platform == 'linux'
+    # via
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-grpc==1.39.1 ; sys_platform == 'linux'
+    # via opentelemetry-exporter-otlp
+opentelemetry-exporter-otlp-proto-http==1.39.1 ; sys_platform == 'linux'
+    # via opentelemetry-exporter-otlp
+opentelemetry-proto==1.39.1 ; sys_platform == 'linux'
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-sdk==1.39.1 ; sys_platform == 'linux'
+    # via
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+    #   pyannote-audio
+opentelemetry-semantic-conventions==0.60b1 ; sys_platform == 'linux'
+    # via opentelemetry-sdk
+openunmix==1.3.0 ; sys_platform == 'linux'
+    # via demucs
+optuna==4.7.0 ; sys_platform == 'linux'
+    # via pyannote-pipeline
+packaging==26.0 ; sys_platform == 'linux'
+    # via
+    #   huggingface-hub
+    #   lazy-loader
+    #   lightning
+    #   lightning-utilities
+    #   marshmallow
+    #   matplotlib
+    #   mido
+    #   onnxruntime
+    #   optuna
+    #   pooch
+    #   pytorch-lightning
+    #   torch-pitch-shift
+    #   torchmetrics
+    #   transformers
+    #   ultrasinger
+    #   wheel
+pandas==3.0.1 ; sys_platform == 'linux'
+    # via
+    #   pyannote-core
+    #   pyannote-database
+    #   pyannote-metrics
+    #   whisperx
+pillow==12.1.1 ; sys_platform == 'linux'
+    # via
+    #   matplotlib
+    #   torchvision
+platformdirs==4.9.2 ; sys_platform == 'linux'
+    # via pooch
+pooch==1.9.0 ; sys_platform == 'linux'
+    # via librosa
+pretty-midi==0.2.11 ; sys_platform == 'linux'
+    # via ultrasinger
+primepy==1.3 ; sys_platform == 'linux'
+    # via torch-pitch-shift
+propcache==0.4.1 ; sys_platform == 'linux'
+    # via
+    #   aiohttp
+    #   yarl
+protobuf==6.33.5 ; sys_platform == 'linux'
+    # via
+    #   googleapis-common-protos
+    #   onnxruntime
+    #   opentelemetry-proto
+pyannote-audio==4.0.4 ; sys_platform == 'linux'
+    # via whisperx
+pyannote-core==6.0.1 ; sys_platform == 'linux'
+    # via
+    #   pyannote-audio
+    #   pyannote-database
+    #   pyannote-metrics
+    #   pyannote-pipeline
+pyannote-database==6.1.1 ; sys_platform == 'linux'
+    # via
+    #   pyannote-audio
+    #   pyannote-metrics
+    #   pyannote-pipeline
+pyannote-metrics==4.0.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+pyannote-pipeline==4.0.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+pyannoteai-sdk==0.4.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+pycparser==3.0 ; implementation_name != 'PyPy' and sys_platform == 'linux'
+    # via cffi
+pycryptodomex==3.24.2 ; sys_platform == 'linux'
+    # via yt-dlp
+pydub==0.25.1 ; sys_platform == 'linux'
+    # via ultrasinger
+pygments==2.19.2 ; sys_platform == 'linux'
+    # via rich
+pyhyphen==4.0.4 ; sys_platform == 'linux'
+    # via ultrasinger
+pyparsing==3.3.2 ; sys_platform == 'linux'
+    # via matplotlib
+python-dateutil==2.9.0.post0 ; sys_platform == 'linux'
+    # via
+    #   matplotlib
+    #   pandas
+python-levenshtein==0.27.3 ; sys_platform == 'linux'
+    # via ultrasinger
+pytorch-lightning==2.6.1 ; sys_platform == 'linux'
+    # via lightning
+pytorch-metric-learning==2.9.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+pyyaml==6.0.3 ; sys_platform == 'linux'
+    # via
+    #   ctranslate2
+    #   demucs
+    #   huggingface-hub
+    #   lightning
+    #   omegaconf
+    #   optuna
+    #   pyannote-database
+    #   pyannote-pipeline
+    #   pytorch-lightning
+    #   transformers
+rapidfuzz==3.14.3 ; sys_platform == 'linux'
+    # via
+    #   levenshtein
+    #   syncedlyrics
+regex==2026.2.19 ; sys_platform == 'linux'
+    # via
+    #   nltk
+    #   transformers
+requests==2.34.2 ; sys_platform == 'linux'
+    # via
+    #   huggingface-hub
+    #   music21
+    #   opentelemetry-exporter-otlp-proto-http
+    #   pooch
+    #   pyannoteai-sdk
+    #   pyhyphen
+    #   syncedlyrics
+    #   transformers
+    #   yt-dlp
+retrying==1.4.2 ; sys_platform == 'linux'
+    # via dora-search
+rich==14.3.3 ; sys_platform == 'linux'
+    # via pyannote-audio
+safetensors==0.7.0 ; sys_platform == 'linux'
+    # via
+    #   pyannote-audio
+    #   transformers
+scikit-learn==1.8.0 ; sys_platform == 'linux'
+    # via
+    #   librosa
+    #   pyannote-metrics
+    #   pytorch-metric-learning
+scipy==1.17.1 ; sys_platform == 'linux'
+    # via
+    #   librosa
+    #   pyannote-metrics
+    #   scikit-learn
+    #   ultrasinger
+setuptools==82.0.0 ; sys_platform == 'linux'
+    # via
+    #   ctranslate2
+    #   pyhyphen
+    #   torch
+    #   triton
+    #   ultrasinger
+six==1.17.0 ; sys_platform == 'linux'
+    # via
+    #   pretty-midi
+    #   python-dateutil
+sortedcontainers==2.4.0 ; sys_platform == 'linux'
+    # via pyannote-core
+soundfile==0.13.1 ; sys_platform == 'linux'
+    # via librosa
+soupsieve==4.1.3 ; sys_platform == 'linux'
+    # via beautifulsoup4
+soxr==1.0.0 ; sys_platform == 'linux'
+    # via librosa
+sqlalchemy==2.0.47 ; sys_platform == 'linux'
+    # via
+    #   alembic
+    #   optuna
+submitit==1.5.4 ; sys_platform == 'linux'
+    # via dora-search
+swift-f0==0.1.2 ; sys_platform == 'linux'
+    # via ultrasinger
+sympy==1.14.0 ; sys_platform == 'linux'
+    # via
+    #   onnxruntime
+    #   torch
+syncedlyrics==1.0.1 ; sys_platform == 'linux'
+    # via ultrasinger-processor-tools
+threadpoolctl==3.6.0 ; sys_platform == 'linux'
+    # via scikit-learn
+tokenizers==0.22.2 ; sys_platform == 'linux'
+    # via
+    #   faster-whisper
+    #   transformers
+torch==2.8.0+cu128 ; sys_platform == 'linux'
+    # via
+    #   asteroid-filterbanks
+    #   demucs
+    #   dora-search
+    #   julius
+    #   lightning
+    #   openunmix
+    #   pyannote-audio
+    #   pytorch-lightning
+    #   pytorch-metric-learning
+    #   torch-audiomentations
+    #   torch-pitch-shift
+    #   torchaudio
+    #   torchmetrics
+    #   torchvision
+    #   ultrasinger
+    #   ultrasinger-processor-tools
+    #   whisperx
+torch-audiomentations==0.12.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+torch-pitch-shift==1.2.5 ; sys_platform == 'linux'
+    # via torch-audiomentations
+torchaudio==2.8.0+cu128 ; sys_platform == 'linux'
+    # via
+    #   demucs
+    #   openunmix
+    #   pyannote-audio
+    #   torch-audiomentations
+    #   torch-pitch-shift
+    #   ultrasinger
+    #   ultrasinger-processor-tools
+    #   whisperx
+torchcodec==0.10.0 ; sys_platform == 'linux'
+    # via pyannote-audio
+torchmetrics==1.8.2 ; sys_platform == 'linux'
+    # via
+    #   lightning
+    #   pyannote-audio
+    #   pytorch-lightning
+torchvision==0.23.0+cu128 ; sys_platform == 'linux'
+    # via
+    #   ultrasinger
+    #   ultrasinger-processor-tools
+tqdm==4.67.3 ; sys_platform == 'linux'
+    # via
+    #   demucs
+    #   faster-whisper
+    #   huggingface-hub
+    #   lightning
+    #   nltk
+    #   openunmix
+    #   optuna
+    #   pyannote-pipeline
+    #   pytorch-lightning
+    #   pytorch-metric-learning
+    #   transformers
+    #   ultrasinger
+transformers==4.57.6 ; sys_platform == 'linux'
+    # via whisperx
+treetable==0.2.6 ; sys_platform == 'linux'
+    # via dora-search
+triton==3.4.0 ; platform_machine == 'x86_64' and sys_platform == 'linux'
+    # via
+    #   torch
+    #   whisperx
+typing-extensions==4.15.0 ; sys_platform == 'linux'
+    # via
+    #   aiosignal
+    #   alembic
+    #   asteroid-filterbanks
+    #   beautifulsoup4
+    #   grpcio
+    #   huggingface-hub
+    #   librosa
+    #   lightning
+    #   lightning-utilities
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+    #   pytorch-lightning
+    #   sqlalchemy
+    #   submitit
+    #   torch
+    #   typing-inspect
+typing-inspect==0.9.0 ; sys_platform == 'linux'
+    # via dataclasses-json
+unidecode==1.4.0 ; sys_platform == 'linux'
+    # via ultrasinger
+urllib3==2.8.0 ; sys_platform == 'linux'
+    # via
+    #   requests
+    #   yt-dlp
+webcolors==25.10.0 ; sys_platform == 'linux'
+    # via music21
+websockets==17.4 ; sys_platform == 'linux'
+    # via yt-dlp
+wheel==0.46.3 ; sys_platform == 'linux'
+    # via pyhyphen
+whisperx==3.8.1 ; sys_platform == 'linux'
+    # via ultrasinger
+yarl==1.22.0 ; sys_platform == 'linux'
+    # via aiohttp
+yt-dlp==2026.11.23 ; sys_platform == 'linux'
+    # via ultrasinger
+yt-dlp-ejs==0.8.0 ; sys_platform == 'linux'
+    # via yt-dlp
+zipp==3.23.0 ; sys_platform == 'linux'
+    # via importlib-metadata

@@ -353,3 +353,8 @@ MigrationBackup/
 **/hangfire.db*
 **/songs.db*
 UltraSinger.Processor/bundles/
+
+# Python tooling (UltraSinger.Processor/python) and docker compose secrets
+.venv/
+__pycache__/
+.env

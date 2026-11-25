@@ -9,11 +9,11 @@ Integrates with UltraSinger to provide a basic UI to add YouTube videos which wi
 ## Architecture
 
 The app is split into two deployables so the browser-facing UI doesn't have to live on the
-machine with Python, WSL, yt-dlp and the GPU:
+machine with Python, yt-dlp and the GPU:
 
 | Project | What it is | Where it runs |
 | --- | --- | --- |
-| `UltraSinger.Processor` | ASP.NET Core Web API + Hangfire. Runs UltraSinger, yt-dlp, lyric lookup and the OpenAI pass. Owns all job state. | The machine with Python/WSL/GPU and the UltraStar library |
+| `UltraSinger.Processor` | ASP.NET Core Web API + Hangfire. Runs UltraSinger, yt-dlp, lyric lookup and the OpenAI pass. Owns all job state. | The machine with the GPU and the UltraStar library (natively, or via Docker) |
 | `UltraSingerUI` | Blazor Server. Talks to the processor over HTTP; holds no job state of its own. | Anywhere |
 | `UltraSinger.Contracts` | DTOs shared by both. | — |
 
@@ -83,20 +83,23 @@ Both projects share a `UserSecretsId`, so a single `secrets.json` serves both.
 
 | Key | Notes |
 | --- | --- |
-| `PythonExecutable`, `PythonArguments` | How to invoke Python (e.g. `wsl` plus args) |
-| `UltraSingerPath` | Repo root; `src/UltraSinger.py` is appended |
-| `UltraStarDeluxeWSLPath` | Output path as UltraSinger sees it |
-| `UltraStarDeluxeLocalLibraryPath` | The same directory as the processor's OS sees it |
+| `PythonEnvironmentPath` | The uv venv. Defaults to `python/.venv`; the tool paths below default to its `bin/`. |
+| `PythonExecutable` | Defaults to the venv's `python` |
+| `UltraSingerPath` | Repo root; `src/UltraSinger.py` is appended. Defaults to the `UltraSinger` submodule. |
+| `UltraStarDeluxeLocalLibraryPath` | The UltraStar `songs` directory. Jobs are staged in a sibling `_jobs` directory. |
 | `KaraokeLanguage` | Defaults to `en` |
-| `UltraSingerAdditionalArgs` | Appended verbatim, e.g. `--demucs htdemucs_ft` |
+| `UltraSingerAdditionalArgs` | Whitespace-separated, e.g. `--demucs htdemucs_ft` (no quoting) |
 | `UltraSingerAdditionalEnvVars` | `MYVAR=value;OTHER=value`. Values containing `;` aren't supported. |
-| `YTDLPPath` | Path to the yt-dlp binary |
+| `YTDLPPath` | Defaults to the venv's `yt-dlp` |
+| `YTDLPCookiesFromBrowser` | yt-dlp `--cookies-from-browser` value (default `firefox`); empty disables |
+| `EnableVocalSeparation`, `VocalSeparationExecutable`, `VocalSeparationAdditionalArgs` | demucs stems for USDB downloads; executable defaults to the venv's `demucs` |
+| `FfmpegPath`, `FfprobePath` | Default to `ffmpeg`/`ffprobe` on `PATH` |
 | `DatabasePath` | Directory for `songs.db` / `hangfire.db`. Defaults to the content root. |
 | `BundleStoragePath` | Directory for finished song zips. Defaults to a `bundles` subdirectory of `DatabasePath`. |
 | `OpenAIKey`, `OpenAIModel`, `EnableOpenAICorrections`, `OverwriteUltraStarFile` | Post-processing pass |
 | `OpenAIAdditionalInstructions` | Appended verbatim to the OpenAI system prompt |
 | `SendTimestampsToOpenAI` | Keep `[mm:ss.xx]` tags in the reference lyrics sent to the model (default `true`) |
-| `SyncedLyricsPath` | Path to the `syncedlyrics` CLI executable |
+| `SyncedLyricsPath` | Defaults to the venv's `syncedlyrics` |
 | `SyncedLyricsMode` | `PreferSynced` (default), `SyncedOnly`, or `PlainOnly` |
 | `SyncedLyricsProviders` | Space-separated provider names, e.g. `lrclib musixmatch`. Empty means all. |
 | `SyncedLyricsLanguage` | Maps to the CLI's `-l` |
@@ -114,7 +117,37 @@ the processor's), and `YT_API_KEY` / `YT_API_KEY_BACKUP` for search.
 means auto-fetch is disabled. `PollIntervalSeconds` — how often to check for unfetched
 completed songs (default `15`).
 
+Relative paths resolve against the processor's content root (the project directory under
+`dotnet run`). A bare command name (e.g. `yt-dlp`) is looked up on `PATH` instead.
+
 ## Running
+
+### Python tooling
+
+UltraSinger is a git submodule at `UltraSinger.Processor/UltraSinger`. Its dependencies, plus
+`syncedlyrics` and a CUDA 12.8 build of torch (needed for RTX 50-series cards), are managed by
+the uv project in `UltraSinger.Processor/python`:
+
+```bash
+git submodule update --init
+cd UltraSinger.Processor/python
+uv sync                                   # creates .venv; the processor finds it automatically
+```
+
+UltraSinger leaves most of its dependencies unpinned and relies on its own `uv.lock`, so
+`pyproject.toml` carries a generated `constraint-dependencies` block copying those versions
+(except the yt-dlp stack, which has to stay current with YouTube). After bumping the
+submodule:
+
+```bash
+python3 update_constraints.py && uv lock && uv sync
+uv lock -P yt-dlp && uv sync              # pick up a newer yt-dlp at any time
+```
+
+No uv? `pip install -r requirements.txt` into a Python 3.12 venv at the same location works
+too. You also need `ffmpeg` on `PATH`.
+
+### Processor
 
 Start the processor on the machine that does the work:
 
@@ -127,6 +160,23 @@ Check `GET /api/health` reports no problems, then start the UI anywhere:
 ```bash
 dotnet run --project UltraSingerUI                # http://*:5109, https://*:7237
 ```
+
+### Processor in Docker (GPU)
+
+`compose.yaml` builds an image holding the processor and the whole Python toolchain together,
+so the processor and the tools it runs see the same paths. It needs `nvidia-container-toolkit`:
+
+```bash
+sudo pacman -S nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+
+cp .env.example .env                      # set ULTRASTAR_DIR etc.
+docker compose up -d --build
+```
+
+Models are cached in the `model-cache` volume and the databases/bundles in `processor-data`.
+The host's Firefox profile is mounted read-only so `--cookies-from-browser firefox` keeps
+working.
 
 If the UI can't reach the processor, or the processor is misconfigured, a banner says so
 rather than the page just sitting there looking idle.

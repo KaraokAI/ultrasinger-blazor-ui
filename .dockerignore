@@ -1,0 +1,11 @@
+**/.git
+**/.idea
+**/.vs
+**/bin
+**/obj
+**/.venv
+**/__pycache__
+**/output
+.env
+UltraSinger.Blazor/
+UltraSinger.Tests/
