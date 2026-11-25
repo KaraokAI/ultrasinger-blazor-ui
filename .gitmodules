@@ -1,0 +1,3 @@
+[submodule "UltraSinger.Processor/UltraSinger"]
+	path = UltraSinger.Processor/UltraSinger
+	url = https://github.com/rakuri255/UltraSinger
