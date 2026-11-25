@@ -5,31 +5,36 @@ namespace UltraSinger.Processor.Services;
 
 /// <summary>
 /// Runs an external vocal-separation tool (demucs by default) against a downloaded USDB
-/// audio file, configured the same way as the main UltraSinger Python process: an
-/// executable + argument prefix that can wrap the call in WSL/conda/etc.
+/// audio file. Defaults to the <c>demucs</c> in the processor's uv venv.
 /// </summary>
 public class VocalSeparationService(
     EnvironmentalValuesService environmentalValues,
     ILogger<VocalSeparationService> logger)
 {
     public async Task<(string? VocalsFileName, string? InstrumentalFileName)> SeparateAsync(
-        SongRecord song, JobDirectories jobDirectories, string audioFileName)
+        SongRecord song, string songDirectory, string audioFileName)
     {
-        var wslInputPath = SongProcessingJob.SanitisePath($"{jobDirectories.WslPath.TrimEnd('/')}/{audioFileName}");
-        var wslOutputDir = SongProcessingJob.SanitisePath(jobDirectories.WslPath);
-
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = environmentalValues.VocalSeparationExecutable,
-                Arguments = $"{environmentalValues.VocalSeparationArguments} {environmentalValues.VocalSeparationAdditionalArgs} -o {wslOutputDir} {wslInputPath}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             }
         };
 
-        logger.LogInformation("Using argument: {FileName} {Arguments}", process.StartInfo.FileName, process.StartInfo.Arguments);
+        foreach (var argument in (IEnumerable<string>)
+                 [
+                     .. environmentalValues.VocalSeparationAdditionalArgs,
+                     "-o", songDirectory,
+                     Path.Combine(songDirectory, audioFileName)
+                 ])
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
+        logger.LogInformation("Running: {FileName} {Arguments}", process.StartInfo.FileName, string.Join(' ', process.StartInfo.ArgumentList));
 
         process.OutputDataReceived += (_, args) => LogLine(song, args.Data, isError: false);
         process.ErrorDataReceived += (_, args) => LogLine(song, args.Data, isError: true);
@@ -44,10 +49,10 @@ public class VocalSeparationService(
             throw new ApplicationException($"demucs exited with code {process.ExitCode}.");
         }
 
-        var (vocalsFileName, instrumentalFileName) = LocateAndRenameStems(jobDirectories.LocalPath, audioFileName, song);
+        var (vocalsFileName, instrumentalFileName) = LocateAndRenameStems(songDirectory, audioFileName, song);
 
-        vocalsFileName = await EnsureMp3Async(jobDirectories.LocalPath, vocalsFileName, song);
-        instrumentalFileName = await EnsureMp3Async(jobDirectories.LocalPath, instrumentalFileName, song);
+        vocalsFileName = await EnsureMp3Async(songDirectory, vocalsFileName, song);
+        instrumentalFileName = await EnsureMp3Async(songDirectory, instrumentalFileName, song);
 
         return (vocalsFileName, instrumentalFileName);
     }

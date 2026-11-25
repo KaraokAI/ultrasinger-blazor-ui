@@ -8,14 +8,6 @@ using UltraSinger.Processor.Entities;
 namespace UltraSinger.Processor.Services;
 
 /// <summary>
-/// Where a single job's raw UltraSinger output lives, nested under the existing WSL/local
-/// root pair rather than a separate temp filesystem — no new path translation is needed, and
-/// because the directory belongs to exactly one job, everything under it is by definition
-/// "the new files" for that job.
-/// </summary>
-public readonly record struct JobDirectories(string LocalPath, string WslPath);
-
-/// <summary>
 /// Runs UltraSinger for a single song. Replaces the old static
 /// <c>SongProcessorService.InternalWorker</c>: it is resolved from DI and enqueued by song
 /// id, so everything it writes lands on the shared <see cref="ISongStore"/> record rather
@@ -49,24 +41,26 @@ public class SongProcessingJob(
         song.State = SongState.IN_PROGRESS;
         song.BeganProcessingAt = DateTime.Now;
 
-        var jobDirectories = new JobDirectories(
-            LocalPath: Path.Combine(environmentalValues.UltraStarDeluxeLocalLibraryPath, "..", "_jobs", song.Id.ToString("N")),
-            WslPath: $"{environmentalValues.UltraStarDeluxeWSLPath.TrimEnd('/')}/../_jobs/{song.Id:N}");
+        // Each job's raw output lives in its own directory beside the library, so everything
+        // under it is by definition "the new files" for that job. Normalised so it matches the
+        // path UltraSinger echoes back in its output (see ParseOutput).
+        var jobDirectory = Path.GetFullPath(
+            Path.Combine(environmentalValues.UltraStarDeluxeLocalLibraryPath, "..", "_jobs", song.Id.ToString("N")));
 
         try
         {
             if (song.Source == SongSource.USDB)
             {
-                await ProcessUsdbSongAsync(song, jobDirectories);
+                await ProcessUsdbSongAsync(song, jobDirectory);
             }
             else
             {
-                await RunUltraSingerAsync(song, jobDirectories);
+                await RunUltraSingerAsync(song, jobDirectory);
 
                 try
                 {
                     // Attempt OpenAI-based improvement of UltraStar file
-                    await TryImproveUltraStarWithOpenAI(song, jobDirectories);
+                    await TryImproveUltraStarWithOpenAI(song, jobDirectory);
                 }
                 catch (Exception ex)
                 {
@@ -79,7 +73,7 @@ public class SongProcessingJob(
 
             // Unlike the OpenAI step above, bundling is the actual deliverable — a failure
             // here must fail the job rather than leave a bundle-less "COMPLETED" song.
-            await BundleSongAsync(song, jobDirectories);
+            await BundleSongAsync(song, jobDirectory);
 
             song.State = SongState.COMPLETED;
         }
@@ -96,42 +90,65 @@ public class SongProcessingJob(
         }
     }
 
-    private async Task RunUltraSingerAsync(SongRecord song, JobDirectories jobDirectories)
+    private async Task RunUltraSingerAsync(SongRecord song, string jobDirectory)
     {
-        Directory.CreateDirectory(jobDirectories.LocalPath);
+        Directory.CreateDirectory(jobDirectory);
 
         var process = new Process();
-        var fileName = environmentalValues.PythonExecutable;
-
-        var ultraStarDeluxePath = SanitisePath($"{environmentalValues.UltraSingerPath.TrimEnd('/', '\\')}/src/UltraSinger.py");
-        var wslOutputPath = SanitisePath(jobDirectories.WslPath);
-
-        var arguments = $"""{environmentalValues.PythonArguments} {ultraStarDeluxePath} -i {song.Url} -o {wslOutputPath} --language "{environmentalValues.KaraokeLanguage}" {environmentalValues.UltraSingerAdditionalArgs}""";
-
-        logger.LogInformation("Using argument: {FileName} {Arguments}", fileName, arguments);
 
         process.StartInfo = new ProcessStartInfo
         {
-            FileName = fileName,
-            Arguments = arguments,
+            FileName = environmentalValues.PythonExecutable,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            // UltraSinger resolves some of its own resources relative to its src directory.
+            WorkingDirectory = Path.GetDirectoryName(environmentalValues.UltraSingerScriptPath),
         };
+
+        // Unbuffered, so progress lines reach the UI as they happen rather than in bursts.
+        process.StartInfo.Environment["PYTHONUNBUFFERED"] = "1";
+
+        foreach (var argument in (IEnumerable<string>)
+                 [
+                     environmentalValues.UltraSingerScriptPath,
+                     "-i", song.Url,
+                     "-o", jobDirectory,
+                     "--language", environmentalValues.KaraokeLanguage,
+                     .. environmentalValues.UltraSingerAdditionalArgs
+                 ])
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
+        logger.LogInformation("Running: {FileName} {Arguments}", process.StartInfo.FileName, string.Join(' ', process.StartInfo.ArgumentList));
 
         foreach (var (key, value) in environmentalValues.GetUltraSingerAdditionalEnvironmentVariables())
         {
             process.StartInfo.Environment[key] = value;
         }
 
+        // Python tracebacks don't carry the [UltraSinger] tag ParseOutput filters on, so keep
+        // the raw tail of stderr to explain a crash.
+        const int stderrTailLength = 30;
+        var stderrTail = new Queue<string>(stderrTailLength);
+
         process.OutputDataReceived += (_, args) =>
         {
-            ParseOutput(song, jobDirectories, args.Data, isError: false);
+            if (args.Data == null) return;
+            ParseOutput(song, jobDirectory, args.Data, isError: false);
             logger.LogInformation("{Line}", args.Data);
         };
         process.ErrorDataReceived += (_, args) =>
         {
-            ParseOutput(song, jobDirectories, args.Data, isError: true);
+            if (args.Data == null) return;
+            ParseOutput(song, jobDirectory, args.Data, isError: true);
             logger.LogInformation("{Line}", args.Data);
+
+            lock (stderrTail)
+            {
+                if (stderrTail.Count == stderrTailLength) stderrTail.Dequeue();
+                stderrTail.Enqueue(AnsiColourCodeRegex.Replace(args.Data, ""));
+            }
         };
 
         process.Start();
@@ -141,7 +158,14 @@ public class SongProcessingJob(
 
         if (process.ExitCode != 0)
         {
-            throw new ApplicationException($"Failed to process URL: {song.ErrorText}");
+            string tail;
+            lock (stderrTail)
+            {
+                tail = string.Join('\n', stderrTail);
+            }
+
+            song.AppendError($"[UltraSinger] Exited with code {process.ExitCode}. Last output:\n{tail}");
+            throw new ApplicationException($"UltraSinger exited with code {process.ExitCode}:\n{tail}");
         }
     }
 
@@ -149,7 +173,7 @@ public class SongProcessingJob(
     /// Filters raw process output down to the <c>[UltraSinger]</c> lines worth showing, and
     /// picks the produced .txt path out of the "Parse ultrastar txt -> " line.
     /// </summary>
-    private void ParseOutput(SongRecord song, JobDirectories jobDirectories, string? source, bool isError)
+    private void ParseOutput(SongRecord song, string jobDirectory, string? source, bool isError)
     {
         if (source == null)
         {
@@ -175,18 +199,18 @@ public class SongProcessingJob(
             return;
         }
 
-        var rootPathIndex = source.IndexOf(jobDirectories.WslPath, StringComparison.Ordinal);
+        var rootPathIndex = source.IndexOf(jobDirectory, StringComparison.Ordinal);
 
         if (rootPathIndex == -1)
         {
             return;
         }
 
-        var relativePathIndex = jobDirectories.WslPath.Length + rootPathIndex;
+        var relativePathIndex = jobDirectory.Length + rootPathIndex;
         song.UltraStarTxtPath = source[relativePathIndex..].TrimStart('/');
     }
 
-    private async Task TryImproveUltraStarWithOpenAI(SongRecord song, JobDirectories jobDirectories)
+    private async Task TryImproveUltraStarWithOpenAI(SongRecord song, string jobDirectory)
     {
         if (!environmentalValues.EnableOpenAICorrections)
         {
@@ -208,9 +232,7 @@ public class SongProcessingJob(
             return;
         }
 
-        var localRoot = jobDirectories.LocalPath.TrimEnd('\\', '/');
-        var relative = song.UltraStarTxtPath!.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
-        var fullPath = Path.Combine(localRoot, relative);
+        var fullPath = Path.Combine(jobDirectory, song.UltraStarTxtPath!.TrimStart('/'));
 
         if (!File.Exists(fullPath))
         {
@@ -259,7 +281,7 @@ public class SongProcessingJob(
         logger.LogInformation("{Message}", msg);
     }
 
-    private async Task ProcessUsdbSongAsync(SongRecord song, JobDirectories jobDirectories)
+    private async Task ProcessUsdbSongAsync(SongRecord song, string jobDirectory)
     {
         song.AppendLog("[USDB] Starting processing of USDB song package...");
 
@@ -274,26 +296,20 @@ public class SongProcessingJob(
         // existing includeBaseDirectory:false zip naturally wraps the song in its own folder
         // too, same as the YouTube path.
         //
-        // The folder itself is named "song" - NOT the title - for exactly the same reason the
-        // files inside it are named "yt.*": every path in here gets passed through a shell to
-        // demucs, and SanitisePath only escapes spaces. A title containing parens/quotes/&
-        // baked into the *directory* name would break that shell call just as surely as it
-        // would in a filename. Only once demucs is done with this path do we rename the folder
-        // itself to the real title, below.
+        // The folder starts out as "song" and the files inside as "yt.*" so every downstream
+        // tool (yt-dlp, ffmpeg, demucs) sees short, predictable paths and output names; only
+        // once they're all done do we rename the folder and files to the real title, below.
         var sanitizedBaseTitle = SanitiseFileNameComponent(!string.IsNullOrWhiteSpace(song.Title) ? song.Title : "Song");
-        var songDirectories = new JobDirectories(
-            LocalPath: Path.Combine(jobDirectories.LocalPath, "song"),
-            WslPath: $"{jobDirectories.WslPath.TrimEnd('/')}/song");
+        var songDirectory = Path.Combine(jobDirectory, "song");
 
-        Directory.CreateDirectory(songDirectories.LocalPath);
+        Directory.CreateDirectory(songDirectory);
 
         song.AppendLog($"[USDB] Downloading media from {song.Url} via yt-dlp...");
 
-        // Deliberately not "%(title)s.%(ext)s": YouTube titles routinely contain
-        // parens/ampersands/etc. that aren't shell-safe, and SanitisePath only escapes
-        // spaces. Every downstream tool (demucs) is invoked through a shell, so the file
-        // stays as this fixed, boring name until it's renamed to the real title below.
-        var outputTemplate = Path.Combine(songDirectories.LocalPath, "yt.%(ext)s");
+        // Deliberately not "%(title)s.%(ext)s": demucs names its output folder after the input
+        // file, and LocateAndRenameStems is simpler with a fixed name. The file is renamed to
+        // the real title below.
+        var outputTemplate = Path.Combine(songDirectory, "yt.%(ext)s");
 
         // UltraStar Deluxe (and the bundled video player) need H.264: bias yt-dlp towards an
         // avc1 stream up front so the ffprobe/ffmpeg fallback below is rarely needed, rather
@@ -305,12 +321,34 @@ public class SongProcessingJob(
             StartInfo = new ProcessStartInfo
             {
                 FileName = environmentalValues.YTDLPPath,
-                Arguments = $"-f \"{formatSelector}\" --merge-output-format mp4 --extract-audio --cookies-from-browser firefox --audio-format mp3 --audio-quality 0 --keep-video -o \"{outputTemplate}\" \"{song.Url}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = songDirectories.LocalPath
+                WorkingDirectory = songDirectory
             }
         };
+
+        List<string> ytdlpArguments =
+        [
+            "-f", formatSelector,
+            "--merge-output-format", "mp4",
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--keep-video",
+            "-o", outputTemplate,
+        ];
+
+        if (environmentalValues.YTDLPCookiesFromBrowser is { } cookiesFromBrowser)
+        {
+            ytdlpArguments.AddRange(["--cookies-from-browser", cookiesFromBrowser]);
+        }
+
+        ytdlpArguments.Add(song.Url);
+
+        foreach (var argument in ytdlpArguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
 
         process.OutputDataReceived += (_, args) =>
         {
@@ -341,7 +379,7 @@ public class SongProcessingJob(
         }
 
         // Identify downloaded audio and video files
-        var allFiles = Directory.GetFiles(songDirectories.LocalPath);
+        var allFiles = Directory.GetFiles(songDirectory);
         var audioFile = allFiles.FirstOrDefault(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
                         ?? allFiles.FirstOrDefault(f => f.EndsWith(".m4a", StringComparison.OrdinalIgnoreCase) ||
                                                         f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase) ||
@@ -358,14 +396,14 @@ public class SongProcessingJob(
 
         if (videoFileName != null)
         {
-            videoFileName = await EnsureH264Async(song, songDirectories.LocalPath, videoFileName);
+            videoFileName = await EnsureH264Async(song, songDirectory, videoFileName);
         }
 
         string? coverFileName = null;
 
         if (song.UsdbSongId is { } usdbSongId)
         {
-            coverFileName = await DownloadCoverAsync(song, songDirectories.LocalPath, usdbSongId);
+            coverFileName = await DownloadCoverAsync(song, songDirectory, usdbSongId);
         }
 
         string? vocalsFileName = null;
@@ -375,7 +413,7 @@ public class SongProcessingJob(
         {
             try
             {
-                (vocalsFileName, instrumentalFileName) = await vocalSeparationService.SeparateAsync(song, songDirectories, audioFileName);
+                (vocalsFileName, instrumentalFileName) = await vocalSeparationService.SeparateAsync(song, songDirectory, audioFileName);
             }
             catch (Exception ex)
             {
@@ -385,18 +423,16 @@ public class SongProcessingJob(
             }
         }
 
-        // Only now that every shell-invoked tool (demucs) is done with the "song/yt.*" path do
-        // we rename the folder and its files to the real title; anything shell-unsafe in the
-        // title can no longer break a command line.
-        var titledLocalPath = Path.Combine(jobDirectories.LocalPath, sanitizedBaseTitle);
-        Directory.Move(songDirectories.LocalPath, titledLocalPath);
-        songDirectories = songDirectories with { LocalPath = titledLocalPath };
+        // Every external tool is done with the "song/yt.*" paths; rename to the real title.
+        var titledDirectory = Path.Combine(jobDirectory, sanitizedBaseTitle);
+        Directory.Move(songDirectory, titledDirectory);
+        songDirectory = titledDirectory;
 
-        audioFileName = RenameToTitledFile(songDirectories.LocalPath, audioFileName, sanitizedBaseTitle);
-        videoFileName = RenameToTitledFile(songDirectories.LocalPath, videoFileName, sanitizedBaseTitle);
-        vocalsFileName = RenameToTitledFile(songDirectories.LocalPath, vocalsFileName, sanitizedBaseTitle, " [Vocals]");
-        instrumentalFileName = RenameToTitledFile(songDirectories.LocalPath, instrumentalFileName, sanitizedBaseTitle, " [Instrumental]");
-        coverFileName = RenameToTitledFile(songDirectories.LocalPath, coverFileName, sanitizedBaseTitle, " [Cover]");
+        audioFileName = RenameToTitledFile(songDirectory, audioFileName, sanitizedBaseTitle);
+        videoFileName = RenameToTitledFile(songDirectory, videoFileName, sanitizedBaseTitle);
+        vocalsFileName = RenameToTitledFile(songDirectory, vocalsFileName, sanitizedBaseTitle, " [Vocals]");
+        instrumentalFileName = RenameToTitledFile(songDirectory, instrumentalFileName, sanitizedBaseTitle, " [Instrumental]");
+        coverFileName = RenameToTitledFile(songDirectory, coverFileName, sanitizedBaseTitle, " [Cover]");
 
         // Once vocals/instrumental exist, the full mix is redundant background noise for the
         // client bundle - the instrumental is what UltraStar Deluxe should actually play back.
@@ -407,7 +443,7 @@ public class SongProcessingJob(
         var updatedTxt = UpdateUltraStarTxtHeaders(txtContent, mp3FileName, videoFileName, vocalsFileName, instrumentalFileName, coverFileName);
 
         var sanitizedFileName = sanitizedBaseTitle + ".txt";
-        var txtFilePath = Path.Combine(songDirectories.LocalPath, sanitizedFileName);
+        var txtFilePath = Path.Combine(songDirectory, sanitizedFileName);
 
         await File.WriteAllTextAsync(txtFilePath, updatedTxt, Encoding.UTF8);
         song.UltraStarTxtPath = sanitizedFileName;
@@ -422,7 +458,7 @@ public class SongProcessingJob(
             .Select(f => f!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var file in Directory.GetFiles(songDirectories.LocalPath))
+        foreach (var file in Directory.GetFiles(songDirectory))
         {
             if (!filesToKeep.Contains(Path.GetFileName(file)))
             {
@@ -562,11 +598,11 @@ public class SongProcessingJob(
     /// step, a failure here is rethrown so the job ends up <see cref="SongState.FAILED"/>
     /// rather than "completed" with nothing for the UI to fetch.
     /// </summary>
-    private Task BundleSongAsync(SongRecord song, JobDirectories jobDirectories)
+    private Task BundleSongAsync(SongRecord song, string jobDirectory)
     {
-        if (!Directory.Exists(jobDirectories.LocalPath))
+        if (!Directory.Exists(jobDirectory))
         {
-            throw new ApplicationException($"No output directory found to bundle at {jobDirectories.LocalPath}.");
+            throw new ApplicationException($"No output directory found to bundle at {jobDirectory}.");
         }
 
         Directory.CreateDirectory(environmentalValues.BundleStoragePath);
@@ -578,11 +614,11 @@ public class SongProcessingJob(
             File.Delete(zipPath);
         }
 
-        ZipFile.CreateFromDirectory(jobDirectories.LocalPath, zipPath, CompressionLevel.NoCompression, includeBaseDirectory: false);
+        ZipFile.CreateFromDirectory(jobDirectory, zipPath, CompressionLevel.NoCompression, includeBaseDirectory: false);
 
         song.BundlePath = zipPath;
 
-        Directory.Delete(jobDirectories.LocalPath, recursive: true);
+        Directory.Delete(jobDirectory, recursive: true);
 
         var msg = $"[UltraSinger][Bundle] Bundled output into {zipPath}";
         song.AppendLog(msg);
@@ -591,14 +627,12 @@ public class SongProcessingJob(
         return Task.CompletedTask;
     }
 
-    public static string SanitisePath(string source) => source.Replace(" ", "\\ ");
-
     private static string SanitiseFileNameComponent(string source) =>
         string.Join("_", source.Split(Path.GetInvalidFileNameChars()));
 
     /// <summary>
     /// Renames a "yt.*"-style download (or a demucs stem derived from one) to the real,
-    /// human-readable title now that no further shell command will see its path.
+    /// human-readable title once no further external tool needs its path.
     /// </summary>
     private static string? RenameToTitledFile(string localDir, string? currentFileName, string sanitizedBaseTitle, string suffix = "")
     {

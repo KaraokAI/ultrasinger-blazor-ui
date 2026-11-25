@@ -5,7 +5,7 @@ using UltraSinger.Blazor.Exceptions;
 
 namespace UltraSinger.Blazor.Services;
 
-public class YouTubeAPIService(IOptions<YouTubeAPIConfiguration> ytCreds)
+public class YouTubeAPIService(IOptions<YouTubeApiConfiguration> ytCreds)
 {
     private readonly HttpClient _httpClient = new();
     private const string ApiUrl = "https://www.googleapis.com/youtube/v3/search";

@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.Configure<YouTubeAPIConfiguration>(opts =>
+builder.Services.Configure<YouTubeApiConfiguration>(opts =>
 {
     var ytSection = builder.Configuration.GetSection("YouTubeAPI");
     opts.ApiKey = ytSection.GetValue<string>("ApiKey");

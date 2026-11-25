@@ -35,6 +35,12 @@ var setup = new EnvironmentalValuesService(
 
 builder.Services.AddSingleton(setup);
 
+// The equivalent of activating the venv for every child process: UltraSinger's yt-dlp needs
+// the venv's deno on PATH, and tools may shell out to each other.
+Environment.SetEnvironmentVariable("PATH",
+    Path.Combine(setup.PythonEnvironmentPath, "bin") + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH"));
+Environment.SetEnvironmentVariable("VIRTUAL_ENV", setup.PythonEnvironmentPath);
+
 if (setup.Validate().Any())
 {
     throw new ArgumentException("Invalid configuration: " + string.Join(", ", setup.Validate()));
