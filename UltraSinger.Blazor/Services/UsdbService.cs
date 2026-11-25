@@ -38,11 +38,21 @@ public class UsdbService
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public UsdbService(IOptions<UsdbConfiguration> options, ILogger<UsdbService> logger)
+        : this(options, logger, handler: null)
+    {
+    }
+
+    /// <summary>
+    /// Lets tests substitute the transport. A supplied handler is used as-is, so it gets no
+    /// cookie container (login state is still tracked via <c>_isLoggedIn</c>). DI only sees
+    /// the public constructor.
+    /// </summary>
+    internal UsdbService(IOptions<UsdbConfiguration> options, ILogger<UsdbService> logger, HttpMessageHandler? handler)
     {
         _configuration = options.Value;
         _logger = logger;
         _cookieContainer = new CookieContainer();
-        var handler = new HttpClientHandler
+        handler ??= new HttpClientHandler
         {
             CookieContainer = _cookieContainer,
             AllowAutoRedirect = true,

@@ -106,8 +106,9 @@ public class EnvironmentalValuesService(
 
         return environmentVarList
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(envKeypair => envKeypair.Split('='))
-            .Select(envKeypair => (Name: envKeypair.First().Trim(), Value: envKeypair.ElementAtOrDefault(1)))
+            // Only the first '=' separates name from value; values may contain '=' themselves.
+            .Select(envKeypair => envKeypair.Split('=', 2, StringSplitOptions.TrimEntries))
+            .Select(envKeypair => (Name: envKeypair[0], Value: envKeypair.ElementAtOrDefault(1)))
             .Where(envKeypair => !string.IsNullOrWhiteSpace(envKeypair.Name))
             .ToList();
     }

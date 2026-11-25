@@ -5,9 +5,22 @@ using UltraSinger.Blazor.Exceptions;
 
 namespace UltraSinger.Blazor.Services;
 
-public class YouTubeAPIService(IOptions<YouTubeApiConfiguration> ytCreds)
+public class YouTubeAPIService
 {
-    private readonly HttpClient _httpClient = new();
+    private readonly IOptions<YouTubeApiConfiguration> ytCreds;
+    private readonly HttpClient _httpClient;
+
+    public YouTubeAPIService(IOptions<YouTubeApiConfiguration> ytCreds)
+        : this(ytCreds, new HttpClient())
+    {
+    }
+
+    /// <summary>Lets tests substitute the transport. DI only sees the public constructor.</summary>
+    internal YouTubeAPIService(IOptions<YouTubeApiConfiguration> ytCreds, HttpClient httpClient)
+    {
+        this.ytCreds = ytCreds;
+        _httpClient = httpClient;
+    }
     private const string ApiUrl = "https://www.googleapis.com/youtube/v3/search";
 
     public async Task<List<YouTubeVideoResult>> SearchVideosAsync(string query, bool tryBackup = false)

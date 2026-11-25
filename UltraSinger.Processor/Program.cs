@@ -92,6 +92,9 @@ app.MapHangfireDashboard();
 
 app.Run();
 
+/// <summary>Public so integration tests can host the app via WebApplicationFactory.</summary>
+public partial class Program;
+
 /// <summary>
 /// Minimal <see cref="Microsoft.Extensions.Options.IOptionsMonitor{T}"/> so configuration can
 /// be read during startup, before the service provider exists.

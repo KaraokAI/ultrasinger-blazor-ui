@@ -28,7 +28,8 @@ public class JobStateReconciler(ISongStore store, ILogger<JobStateReconciler> lo
         {
             try
             {
-                Reconcile();
+                using var connection = JobStorage.Current.GetConnection();
+                Reconcile(connection);
             }
             catch (Exception ex)
             {
@@ -37,10 +38,8 @@ public class JobStateReconciler(ISongStore store, ILogger<JobStateReconciler> lo
         }
     }
 
-    private void Reconcile()
+    internal void Reconcile(Hangfire.Storage.IStorageConnection connection)
     {
-        using var connection = JobStorage.Current.GetConnection();
-
         foreach (var song in store.GetAll().Where(x => Unsettled.Contains(x.State)))
         {
             if (string.IsNullOrWhiteSpace(song.JobId))

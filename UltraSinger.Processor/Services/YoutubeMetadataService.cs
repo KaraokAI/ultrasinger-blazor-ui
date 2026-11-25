@@ -38,8 +38,12 @@ public class YoutubeMetadataService(EnvironmentalValuesService environmentalValu
         var result = await ytdlProcess.RunAsync(new[] { url }, options);
         ytdlProcess.OutputReceived -= OutputData;
 
-        return result == 0
-            ? OutputBuffer.ToString()
+        // yt-dlp's output ends in a newline (and the reader appends one per line), which
+        // would otherwise end up in the stored title and every name derived from it.
+        var title = OutputBuffer.ToString().Trim();
+
+        return result == 0 && title.Length > 0
+            ? title
             : null;
     }
 

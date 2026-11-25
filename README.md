@@ -178,6 +178,22 @@ Models are cached in the `model-cache` volume and the databases/bundles in `proc
 The host's Firefox profile is mounted read-only so `--cookies-from-browser firefox` keeps
 working.
 
+### Tests
+
+```bash
+dotnet test                               # runs both test projects (~6s)
+```
+
+- `UltraSinger.Processor.Tests`: xunit v3, NSubstitute and `WebApplicationFactory`. External
+  tools (UltraSinger's python, yt-dlp, demucs, ffmpeg, syncedlyrics) are replaced with small bash
+  scripts that record their arguments and fake the tools' output files, so the real job code runs
+  end to end without a GPU, models or network. The tests need Linux, since the fakes are bash.
+- `UltraSinger.Blazor.Tests`: bUnit. Components run against the real services, which talk to an
+  in-memory fake of the processor API and fake USDB/YouTube HTTP handlers.
+
+`global.json` opts into Microsoft.Testing.Platform, which xunit v3 needs for `dotnet test` on
+.NET 10+ SDKs.
+
 If the UI can't reach the processor, or the processor is misconfigured, a banner says so
 rather than the page just sitting there looking idle.
 

@@ -171,7 +171,7 @@ public class OpenAIImproverService(
         }
     }
 
-    private static string StripCodeFences(string input)
+    internal static string StripCodeFences(string input)
     {
         var s = input.Trim();
         if (s.StartsWith("```"))
