@@ -1,6 +1,6 @@
 namespace UltraSinger.Blazor.Configuration;
 
-public record YouTubeAPIConfiguration
+public record YouTubeApiConfiguration
 {
     public string? ApiKey { get; set; }
     

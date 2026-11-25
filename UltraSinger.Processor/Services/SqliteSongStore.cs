@@ -15,9 +15,12 @@ public class SqliteSongStore(SongDatabase database, ILogger<SqliteSongStore> log
 {
     private readonly ConcurrentDictionary<Guid, SongRecord> _songs = new();
 
+    // Deliberately excludes COMPLETED: whether a completed song is worth reprocessing (e.g.
+    // the local copy went missing) is a call only a remote client can make, since the
+    // processor has no visibility into what's actually on disk at the client end.
     private static readonly SongState[] BlocksRequeue =
     [
-        SongState.COMPLETED, SongState.IN_PROGRESS, SongState.NOT_STARTED
+        SongState.IN_PROGRESS, SongState.NOT_STARTED
     ];
 
     /// <summary>
@@ -52,13 +55,16 @@ public class SqliteSongStore(SongDatabase database, ILogger<SqliteSongStore> log
     /// <summary>Records with unsaved changes. Used by the flusher.</summary>
     public IReadOnlyList<SongRecord> GetDirty() => _songs.Values.Where(x => x.IsDirty).ToList();
 
-    public SongRecord Add(string url, string? title)
+    public SongRecord Add(string url, string? title, SongSource source = SongSource.YouTube, int? usdbSongId = null, string? ultraStarTxt = null)
     {
         var record = new SongRecord
         {
             Id = Guid.NewGuid(),
             Url = url,
-            Title = title
+            Title = title,
+            Source = source,
+            UsdbSongId = usdbSongId,
+            UltraStarTxt = ultraStarTxt
         };
 
         _songs[record.Id] = record;
@@ -76,7 +82,7 @@ public class SqliteSongStore(SongDatabase database, ILogger<SqliteSongStore> log
             .OrderByDescending(x => x.BeganProcessingAt ?? x.CreatedAt)
             .FirstOrDefault();
 
-    public bool HasActiveOrCompleted(string url) =>
+    public bool HasActive(string url) =>
         _songs.Values.Any(x => x.Url == url && BlocksRequeue.Contains(x.State));
 
     public void Remove(Guid id)

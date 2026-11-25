@@ -23,7 +23,7 @@ public class SongQueueService(
 {
     public async Task<(EnqueueOutcome Outcome, SongDto Song)> EnqueueAsync(EnqueueSongRequest request)
     {
-        if (store.HasActiveOrCompleted(request.Url))
+        if (store.HasActive(request.Url))
         {
             // Already processed/processing/will be processed.
             var existing = store.GetAll().First(x => x.Url == request.Url);
@@ -39,7 +39,7 @@ public class SongQueueService(
             title = await TryResolveTitleAsync(request.Url);
         }
 
-        var record = store.Add(request.Url, title);
+        var record = store.Add(request.Url, title, request.Source, request.UsdbSongId, request.UltraStarTxt);
 
         var songId = record.Id;
         record.JobId = jobClient.Enqueue<SongProcessingJob>(Queues.SongQueue, job => job.ProcessAsync(songId));

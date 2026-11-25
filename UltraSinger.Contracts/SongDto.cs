@@ -24,6 +24,10 @@ public record SongDto
 
     public string? UltraStarTxtPath { get; init; }
 
+    public SongSource Source { get; init; } = SongSource.YouTube;
+
+    public int? UsdbSongId { get; init; }
+
     /// <summary>
     /// When the UI last successfully fetched and extracted this song's bundle. Null means a
     /// completed song is still waiting to be pulled down.

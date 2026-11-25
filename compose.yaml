@@ -1,0 +1,39 @@
+# GPU deployment of UltraSinger.Processor. Requires nvidia-container-toolkit on the host:
+#   sudo pacman -S nvidia-container-toolkit
+#   sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+#
+# Copy .env.example to .env, fill it in, then:  docker compose up -d --build
+services:
+  processor:
+    build:
+      context: .
+      dockerfile: UltraSinger.Processor/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: ultrasinger-processor
+    restart: unless-stopped
+    ports:
+      - "5209:5209"
+    environment:
+      Processor__ApiKey: ${PROCESSOR_API_KEY:-}
+      ProcessorOptions__OpenAIKey: ${OPENAI_API_KEY:-}
+      ProcessorOptions__EnableOpenAICorrections: ${ENABLE_OPENAI_CORRECTIONS:-false}
+    volumes:
+      # Jobs are staged in <library>/_jobs, beside the songs directory.
+      - ${ULTRASTAR_DIR:?set ULTRASTAR_DIR in .env}:/library
+      - processor-data:/data
+      - model-cache:/cache
+      # Lets yt-dlp's --cookies-from-browser firefox see the host's logged-in profile.
+      - ${FIREFOX_PROFILE_DIR:-~/.config/mozilla/firefox}:/home/app/.config/mozilla/firefox:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  processor-data:
+  model-cache:

@@ -1,21 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <UserSecretsId>545e667d-0842-453c-a9c5-7ca6cc351aa2</UserSecretsId>
+        <!-- The Python tooling (submodule + uv venv) isn't part of the .NET build; without
+             this the Web SDK globs every .json in the venv into the publish output. -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);UltraSinger/**;python/**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
         <!-- 1.8.23 is the floor required by Hangfire.Storage.SQLite. -->
-        <PackageReference Include="Hangfire.AspNetCore" Version="1.8.23" />
-        <PackageReference Include="Hangfire.Core" Version="1.8.23" />
+        <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
+        <PackageReference Include="Hangfire.Core" Version="1.8.25" />
         <PackageReference Include="Hangfire.Storage.SQLite" Version="0.4.3" />
-        <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
-        <PackageReference Include="YoutubeDLSharp" Version="1.1.2" />
+        <PackageReference Include="HtmlAgilityPack" Version="1.13.1" />
+        <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0" />
+        <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
         <PackageReference Include="OpenAI">
-            <Version>2.7.0</Version>
+            <Version>2.15.0</Version>
         </PackageReference>
     </ItemGroup>
 

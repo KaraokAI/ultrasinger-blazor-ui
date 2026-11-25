@@ -10,4 +10,7 @@ public record LibraryConfiguration
 
     /// <summary>How often to check for completed-but-unfetched songs.</summary>
     public int PollIntervalSeconds { get; set; } = 15;
+
+    /// <summary>Path to yt-dlp executable. Defaults to "yt-dlp".</summary>
+    public string YTDLPPath { get; set; } = "yt-dlp";
 }

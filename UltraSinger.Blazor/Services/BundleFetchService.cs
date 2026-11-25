@@ -17,6 +17,8 @@ namespace UltraSinger.Blazor.Services;
 public class BundleFetchService(
     ProcessorApiClient processor,
     IOptionsMonitor<LibraryConfiguration> options,
+    LocalLibraryService localLibraryService,
+    BlazorSongQueueService songQueueService,
     ILogger<BundleFetchService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -72,9 +74,21 @@ public class BundleFetchService(
             return;
         }
 
+        string? extractedTxtPath = null;
         try
         {
             Directory.CreateDirectory(localPath);
+
+            // Read entries before extracting to identify the txt file path
+            using (var zipArchive = ZipFile.OpenRead(tempZip))
+            {
+                var txtEntry = zipArchive.Entries.FirstOrDefault(e => e.FullName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase));
+                if (txtEntry != null)
+                {
+                    extractedTxtPath = Path.Combine(localPath, txtEntry.FullName);
+                }
+            }
+
             ZipFile.ExtractToDirectory(tempZip, localPath, overwriteFiles: true);
         }
         catch (Exception ex)
@@ -90,6 +104,54 @@ public class BundleFetchService(
         if (!await processor.AckBundleFetchedAsync(song.Id, cancellationToken))
         {
             logger.LogWarning("Extracted bundle for {SongId} but ack failed; will retry next poll.", song.Id);
+        }
+
+        // Refresh local library cache
+        try
+        {
+            localLibraryService.Refresh();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to refresh local library cache after extracting {SongId}", song.Id);
+        }
+
+        // Determine artist and title
+        string artist = string.Empty;
+        string title = song.Title ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(extractedTxtPath) && File.Exists(extractedTxtPath))
+        {
+            var parsed = LocalLibraryService.ParseUltraStarTxtFile(extractedTxtPath);
+            if (parsed != null)
+            {
+                artist = parsed.Artist;
+                title = parsed.Title;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(artist) && title.Contains(" - "))
+        {
+            var parts = title.Split(" - ", 2);
+            artist = parts[0].Trim();
+            title = parts[1].Trim();
+        }
+
+        // Automatically add to Blazor song queue
+        try
+        {
+            songQueueService.Enqueue(new SongQueueItem
+            {
+                Title = title,
+                Artist = artist,
+                Source = song.Source,
+                FilePath = extractedTxtPath,
+                QueuedAt = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue song {SongId} to Blazor song queue.", song.Id);
         }
     }
 

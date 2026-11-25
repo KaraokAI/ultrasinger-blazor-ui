@@ -10,10 +10,13 @@ public partial class History : ComponentBase, IAsyncDisposable
 
     [Inject]
     private ProcessorApiClient Processor { get; set; } = null!;
-
+    
     private readonly CancellationTokenSource _cts = new();
 
     private Task? _pollTask;
+    private Guid? QueuingSongId { get; set; }
+    private string? FeedbackMessage { get; set; }
+    private bool IsFeedbackError { get; set; }
 
     /// <summary>
     /// Newest first, as ordered by the processor. Job state comes down with the list — the

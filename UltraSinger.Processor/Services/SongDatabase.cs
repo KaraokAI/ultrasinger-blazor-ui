@@ -48,6 +48,9 @@ public class SongDatabase(EnvironmentalValuesService environmentalValues, ILogge
         // songs.db that already existed before these columns did.
         EnsureColumn(connection, "Songs", "BundlePath", "TEXT");
         EnsureColumn(connection, "Songs", "FetchedAt", "TEXT");
+        EnsureColumn(connection, "Songs", "Source", "INTEGER DEFAULT 0");
+        EnsureColumn(connection, "Songs", "UsdbSongId", "INTEGER");
+        EnsureColumn(connection, "Songs", "UltraStarTxt", "TEXT");
 
         logger.LogInformation("Song database ready at {Path}", environmentalValues.SongDatabasePath);
     }
@@ -81,7 +84,8 @@ public class SongDatabase(EnvironmentalValuesService environmentalValues, ILogge
         command.CommandText =
             """
             SELECT Id, Url, Title, JobId, State, CreatedAt, BeganProcessingAt,
-                   CompletedAt, UltraStarTxtPath, BundlePath, FetchedAt, Log, Errors
+                   CompletedAt, UltraStarTxtPath, BundlePath, FetchedAt,
+                   Source, UsdbSongId, UltraStarTxt, Log, Errors
             FROM Songs ORDER BY CreatedAt DESC
             """;
 
@@ -102,8 +106,11 @@ public class SongDatabase(EnvironmentalValuesService environmentalValues, ILogge
                 reader.IsDBNull(8) ? null : reader.GetString(8),
                 reader.IsDBNull(9) ? null : reader.GetString(9),
                 ReadNullableDate(reader, 10),
-                reader.GetString(11),
-                reader.GetString(12))));
+                reader.IsDBNull(11) ? SongSource.YouTube : (SongSource)reader.GetInt32(11),
+                reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                reader.IsDBNull(13) ? null : reader.GetString(13),
+                reader.GetString(14),
+                reader.GetString(15))));
         }
 
         return records;
@@ -124,20 +131,25 @@ public class SongDatabase(EnvironmentalValuesService environmentalValues, ILogge
         command.CommandText =
             """
             INSERT INTO Songs (Id, Url, Title, JobId, State, CreatedAt, BeganProcessingAt,
-                               CompletedAt, UltraStarTxtPath, BundlePath, FetchedAt, Log, Errors)
+                               CompletedAt, UltraStarTxtPath, BundlePath, FetchedAt,
+                               Source, UsdbSongId, UltraStarTxt, Log, Errors)
             VALUES ($id, $url, $title, $jobId, $state, $createdAt, $beganAt,
-                    $completedAt, $txtPath, $bundlePath, $fetchedAt, $log, $errors)
+                    $completedAt, $txtPath, $bundlePath, $fetchedAt,
+                    $source, $usdbSongId, $ultraStarTxt, $log, $errors)
             ON CONFLICT(Id) DO UPDATE SET
                 Title = excluded.Title, JobId = excluded.JobId, State = excluded.State,
                 BeganProcessingAt = excluded.BeganProcessingAt, CompletedAt = excluded.CompletedAt,
                 UltraStarTxtPath = excluded.UltraStarTxtPath, BundlePath = excluded.BundlePath,
-                FetchedAt = excluded.FetchedAt, Log = excluded.Log, Errors = excluded.Errors
+                FetchedAt = excluded.FetchedAt, Source = excluded.Source,
+                UsdbSongId = excluded.UsdbSongId, UltraStarTxt = excluded.UltraStarTxt,
+                Log = excluded.Log, Errors = excluded.Errors
             """;
 
         var parameters = new[]
         {
             "$id", "$url", "$title", "$jobId", "$state", "$createdAt",
-            "$beganAt", "$completedAt", "$txtPath", "$bundlePath", "$fetchedAt", "$log", "$errors"
+            "$beganAt", "$completedAt", "$txtPath", "$bundlePath", "$fetchedAt",
+            "$source", "$usdbSongId", "$ultraStarTxt", "$log", "$errors"
         }.ToDictionary(name => name, name => command.Parameters.Add(name, SqliteType.Text));
 
         foreach (var snapshot in snapshots)
@@ -146,13 +158,16 @@ public class SongDatabase(EnvironmentalValuesService environmentalValues, ILogge
             parameters["$url"].Value = snapshot.Url;
             parameters["$title"].Value = (object?)snapshot.Title ?? DBNull.Value;
             parameters["$jobId"].Value = (object?)snapshot.JobId ?? DBNull.Value;
-            parameters["$state"].Value = (int)snapshot.State;
+            parameters["$state"].Value = ((int)snapshot.State).ToString();
             parameters["$createdAt"].Value = snapshot.CreatedAt.ToString("O");
             parameters["$beganAt"].Value = (object?)snapshot.BeganProcessingAt?.ToString("O") ?? DBNull.Value;
             parameters["$completedAt"].Value = (object?)snapshot.CompletedAt?.ToString("O") ?? DBNull.Value;
             parameters["$txtPath"].Value = (object?)snapshot.UltraStarTxtPath ?? DBNull.Value;
             parameters["$bundlePath"].Value = (object?)snapshot.BundlePath ?? DBNull.Value;
             parameters["$fetchedAt"].Value = (object?)snapshot.FetchedAt?.ToString("O") ?? DBNull.Value;
+            parameters["$source"].Value = ((int)snapshot.Source).ToString();
+            parameters["$usdbSongId"].Value = (object?)snapshot.UsdbSongId?.ToString() ?? DBNull.Value;
+            parameters["$ultraStarTxt"].Value = (object?)snapshot.UltraStarTxt ?? DBNull.Value;
             parameters["$log"].Value = snapshot.Log;
             parameters["$errors"].Value = snapshot.Errors;
 

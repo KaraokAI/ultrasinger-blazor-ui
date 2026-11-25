@@ -14,21 +14,36 @@ public class EnvironmentalValuesService(
 {
     private UltraSingerConfiguration Configuration => options.CurrentValue;
 
-    public string UltraSingerPath => Configuration.UltraSingerPath ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:UltraSingerPath is not set.");
+    /// <summary>The uv virtualenv from <c>python/pyproject.toml</c>; tool defaults live under its <c>bin/</c>.</summary>
+    public string PythonEnvironmentPath => ResolvePath(
+        string.IsNullOrWhiteSpace(Configuration.PythonEnvironmentPath) ? Path.Combine("python", ".venv") : Configuration.PythonEnvironmentPath);
 
-    public string PythonExecutable => Configuration.PythonExecutable ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:PythonExecutable is not set.");
+    public string UltraSingerPath => ResolvePath(
+        string.IsNullOrWhiteSpace(Configuration.UltraSingerPath) ? "UltraSinger" : Configuration.UltraSingerPath);
 
-    public string UltraSingerAdditionalArgs => Configuration.UltraSingerAdditionalArgs;
+    public string UltraSingerScriptPath => Path.Combine(UltraSingerPath, "src", "UltraSinger.py");
 
-    public string PythonArguments => Configuration.PythonArguments ?? "";
+    public string PythonExecutable => ResolveTool(Configuration.PythonExecutable, "python");
+
+    public IReadOnlyList<string> UltraSingerAdditionalArgs => SplitArguments(Configuration.UltraSingerAdditionalArgs);
 
     public string UltraStarDeluxeLocalLibraryPath => Configuration.UltraStarDeluxeLocalLibraryPath ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:UltraStarDeluxeLocalLibraryPath is not set.");
 
-    public string UltraStarDeluxeWSLPath => Configuration.UltraStarDeluxeWSLPath ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:UltraStarDeluxeWSLPath is not set.");
-
     public string KaraokeLanguage => Configuration.KaraokeLanguage ?? "en";
 
-    public string YTDLPPath => Configuration.YTDLPPath ?? throw new InvalidOperationException("Required configuration value ProcessorOptions:YTDLPPath is not set.");
+    public string YTDLPPath => ResolveTool(Configuration.YTDLPPath, "yt-dlp");
+
+    public string? YTDLPCookiesFromBrowser =>
+        string.IsNullOrWhiteSpace(Configuration.YTDLPCookiesFromBrowser) ? null : Configuration.YTDLPCookiesFromBrowser;
+
+    public string FfmpegPath => string.IsNullOrWhiteSpace(Configuration.FfmpegPath) ? "ffmpeg" : Configuration.FfmpegPath;
+
+    public string FfprobePath => string.IsNullOrWhiteSpace(Configuration.FfprobePath) ? "ffprobe" : Configuration.FfprobePath;
+
+    // Vocal separation settings (USDB downloads only)
+    public bool EnableVocalSeparation => Configuration.EnableVocalSeparation;
+    public string VocalSeparationExecutable => ResolveTool(Configuration.VocalSeparationExecutable, "demucs");
+    public IReadOnlyList<string> VocalSeparationAdditionalArgs => SplitArguments(Configuration.VocalSeparationAdditionalArgs);
 
     // OpenAI settings
     public string? OpenAIKey => Configuration.OpenAIKey;
@@ -38,7 +53,7 @@ public class EnvironmentalValuesService(
     public bool SendTimestampsToOpenAI => Configuration.SendTimestampsToOpenAI;
 
     // syncedlyrics CLI settings
-    public string? SyncedLyricsPath => Configuration.SyncedLyricsPath;
+    public string SyncedLyricsPath => ResolveTool(Configuration.SyncedLyricsPath, "syncedlyrics");
     public SyncedLyricsMode SyncedLyricsMode => Configuration.SyncedLyricsMode;
     public string? SyncedLyricsProviders => Configuration.SyncedLyricsProviders;
     public string? SyncedLyricsLanguage => Configuration.SyncedLyricsLanguage;
@@ -79,9 +94,7 @@ public class EnvironmentalValuesService(
     /// Values including semicolons (;) are not supported at current time.
     ///
     /// Blank segments are discarded. An empty setting, or a trailing semicolon, would
-    /// otherwise yield a variable with an empty name, and Windows rejects the whole
-    /// environment block for that — every job then dies with Win32 error 87 ("the parameter
-    /// is incorrect") before the interpreter is even started.
+    /// otherwise yield a variable with an empty name and break process start-up.
     /// </summary>
     public List<(string, string?)> GetUltraSingerAdditionalEnvironmentVariables()
     {
@@ -115,17 +128,31 @@ public class EnvironmentalValuesService(
             }
         }
 
-        Require(nameof(Configuration.PythonExecutable), Configuration.PythonExecutable);
-        Require(nameof(Configuration.UltraSingerPath), Configuration.UltraSingerPath);
-        Require(nameof(Configuration.UltraStarDeluxeWSLPath), Configuration.UltraStarDeluxeWSLPath);
         Require(nameof(Configuration.UltraStarDeluxeLocalLibraryPath), Configuration.UltraStarDeluxeLocalLibraryPath);
-        Require(nameof(Configuration.YTDLPPath), Configuration.YTDLPPath);
 
         if (!string.IsNullOrWhiteSpace(Configuration.UltraStarDeluxeLocalLibraryPath)
             && !Directory.Exists(Configuration.UltraStarDeluxeLocalLibraryPath))
         {
             problems.Add($"UltraStar library path does not exist: {Configuration.UltraStarDeluxeLocalLibraryPath}");
         }
+
+        if (!File.Exists(UltraSingerScriptPath))
+        {
+            problems.Add($"UltraSinger script not found at {UltraSingerScriptPath} (run `git submodule update --init`).");
+        }
+
+        void RequireExecutable(string name, string path)
+        {
+            if (!ExecutableExists(path))
+            {
+                problems.Add($"{name} not found at '{path}' (run `uv sync` in UltraSinger.Processor/python, or set ProcessorOptions:{name}).");
+            }
+        }
+
+        RequireExecutable(nameof(Configuration.PythonExecutable), PythonExecutable);
+        RequireExecutable(nameof(Configuration.YTDLPPath), YTDLPPath);
+        RequireExecutable(nameof(Configuration.FfmpegPath), FfmpegPath);
+        RequireExecutable(nameof(Configuration.FfprobePath), FfprobePath);
 
         if (Configuration.EnableOpenAICorrections)
         {
@@ -135,14 +162,12 @@ public class EnvironmentalValuesService(
             }
 
             // Surfaced up front rather than at the end of a long transcription.
-            if (string.IsNullOrWhiteSpace(Configuration.SyncedLyricsPath))
-            {
-                problems.Add("OpenAI corrections are enabled but ProcessorOptions:SyncedLyricsPath is not set.");
-            }
-            else if (!File.Exists(Configuration.SyncedLyricsPath))
-            {
-                problems.Add($"syncedlyrics executable not found at: {Configuration.SyncedLyricsPath}");
-            }
+            RequireExecutable(nameof(Configuration.SyncedLyricsPath), SyncedLyricsPath);
+        }
+
+        if (Configuration.EnableVocalSeparation)
+        {
+            RequireExecutable(nameof(Configuration.VocalSeparationExecutable), VocalSeparationExecutable);
         }
 
         if (!Directory.Exists(DatabaseDirectory))
@@ -152,4 +177,38 @@ public class EnvironmentalValuesService(
 
         return problems;
     }
+
+    private string ResolvePath(string path) => Path.GetFullPath(path, environment.ContentRootPath);
+
+    /// <summary>
+    /// A configured value is used as-is when it's a bare command name (looked up on PATH) and
+    /// resolved against the content root when it's a path. Unset falls back to the venv.
+    /// </summary>
+    private string ResolveTool(string? configured, string venvBinary)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return Path.Combine(PythonEnvironmentPath, "bin", venvBinary);
+        }
+
+        return configured.Contains(Path.DirectorySeparatorChar) ? ResolvePath(configured) : configured;
+    }
+
+    private static bool ExecutableExists(string path)
+    {
+        if (path.Contains(Path.DirectorySeparatorChar))
+        {
+            return File.Exists(path);
+        }
+
+        var searchPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+        return searchPath
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Any(directory => File.Exists(Path.Combine(directory, path)));
+    }
+
+    private static IReadOnlyList<string> SplitArguments(string? arguments) =>
+        string.IsNullOrWhiteSpace(arguments)
+            ? []
+            : arguments.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 }

@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.Configure<YouTubeAPIConfiguration>(opts =>
+builder.Services.Configure<YouTubeApiConfiguration>(opts =>
 {
     var ytSection = builder.Configuration.GetSection("YouTubeAPI");
     opts.ApiKey = ytSection.GetValue<string>("ApiKey");
@@ -16,6 +16,7 @@ builder.Services.Configure<YouTubeAPIConfiguration>(opts =>
 });
 
 builder.Services.Configure<LibraryConfiguration>(builder.Configuration.GetSection("Library"));
+builder.Services.Configure<UsdbConfiguration>(builder.Configuration.GetSection("USDB"));
 
 var processorConfiguration = builder.Configuration.GetSection("Processor").Get<ProcessorConfiguration>()
                              ?? new ProcessorConfiguration();
@@ -42,6 +43,11 @@ builder.Services.AddHttpClient<ProcessorApiClient>(client =>
 });
 
 builder.Services.AddScoped<YouTubeAPIService>();
+builder.Services.AddSingleton<UsdbService>();
+builder.Services.AddSingleton<LocalLibraryService>();
+builder.Services.AddSingleton<BlazorSongQueueService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BlazorSongQueueService>());
+builder.Services.AddScoped<UnifiedSearchService>();
 builder.Services.AddHostedService<BundleFetchService>();
 
 var app = builder.Build();

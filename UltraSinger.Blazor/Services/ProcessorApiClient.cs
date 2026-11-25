@@ -25,13 +25,31 @@ public class ProcessorApiClient(
     ProcessorConnectionState connectionState,
     ILogger<ProcessorApiClient> logger)
 {
-    public async Task<EnqueueResult> EnqueueAsync(string url, string? title = null, CancellationToken cancellationToken = default)
+    public async Task<EnqueueResult> EnqueueAsync(
+        string url,
+        string? title = null,
+        SongSource source = SongSource.YouTube,
+        int? usdbSongId = null,
+        string? ultraStarTxt = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await EnqueueAsync(new EnqueueSongRequest
+        {
+            Url = url,
+            Title = title,
+            Source = source,
+            UsdbSongId = usdbSongId,
+            UltraStarTxt = ultraStarTxt
+        }, cancellationToken);
+    }
+
+    public async Task<EnqueueResult> EnqueueAsync(EnqueueSongRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
             var response = await http.PostAsJsonAsync(
                 "api/songs",
-                new EnqueueSongRequest { Url = url, Title = title },
+                request,
                 cancellationToken);
 
             connectionState.MarkReachable();
@@ -43,7 +61,7 @@ public class ProcessorApiClient(
 
             if (!response.IsSuccessStatusCode)
             {
-                logger.LogWarning("Enqueue of {Url} failed with {StatusCode}", url, response.StatusCode);
+                logger.LogWarning("Enqueue of {Url} failed with {StatusCode}", request.Url, response.StatusCode);
                 connectionState.MarkUnreachable($"Processor rejected the request ({(int)response.StatusCode}).");
                 return EnqueueResult.Failed;
             }
@@ -63,6 +81,76 @@ public class ProcessorApiClient(
 
     public async Task<IReadOnlyList<SongDto>> GetSongsAsync(CancellationToken cancellationToken = default) =>
         await GetAsync<List<SongDto>>("api/songs", cancellationToken) ?? [];
+
+    public async Task<IReadOnlyList<SongQueueItem>> GetPlayQueueAsync(CancellationToken cancellationToken = default) =>
+        await GetAsync<List<SongQueueItem>>("api/playqueue", cancellationToken) ?? [];
+
+    public async Task<SongQueueItem?> EnqueuePlayQueueItemAsync(SongQueueItem item, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await http.PostAsJsonAsync("api/playqueue", item, cancellationToken);
+            connectionState.MarkReachable();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Play queue add failed with {StatusCode}", response.StatusCode);
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<SongQueueItem>(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            MarkUnreachable(ex);
+            return null;
+        }
+    }
+
+    public Task<bool> RemovePlayQueueItemAsync(Guid id, CancellationToken cancellationToken = default) =>
+        SendPlayQueueCommandAsync(() => http.DeleteAsync($"api/playqueue/{id}", cancellationToken));
+
+    public Task<bool> MovePlayQueueItemUpAsync(Guid id, CancellationToken cancellationToken = default) =>
+        SendPlayQueueCommandAsync(() => http.PostAsync($"api/playqueue/{id}/up", content: null, cancellationToken));
+
+    public Task<bool> MovePlayQueueItemDownAsync(Guid id, CancellationToken cancellationToken = default) =>
+        SendPlayQueueCommandAsync(() => http.PostAsync($"api/playqueue/{id}/down", content: null, cancellationToken));
+
+    public Task<bool> MarkPlayQueueItemSungAsync(Guid id, bool isSung, CancellationToken cancellationToken = default) =>
+        SendPlayQueueCommandAsync(() => http.PostAsJsonAsync($"api/playqueue/{id}/sung", new { isSung }, cancellationToken));
+
+    public Task<bool> ClearPlayQueueAsync(CancellationToken cancellationToken = default) =>
+        SendPlayQueueCommandAsync(() => http.DeleteAsync("api/playqueue", cancellationToken));
+
+    private async Task<bool> SendPlayQueueCommandAsync(Func<Task<HttpResponseMessage>> send)
+    {
+        try
+        {
+            var response = await send();
+            connectionState.MarkReachable();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Play queue command failed with {StatusCode}", response.StatusCode);
+                return false;
+            }
+
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            MarkUnreachable(ex);
+            return false;
+        }
+    }
 
     public Task<CurrentActivityDto?> GetActivityAsync(int sinceOffset, CancellationToken cancellationToken = default) =>
         GetAsync<CurrentActivityDto>($"api/activity?sinceOffset={sinceOffset}", cancellationToken);

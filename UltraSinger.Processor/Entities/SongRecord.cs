@@ -23,6 +23,9 @@ public class SongRecord
     private string? _ultraStarTxtPath;
     private string? _bundlePath;
     private DateTime? _fetchedAt;
+    private SongSource _source = SongSource.YouTube;
+    private int? _usdbSongId;
+    private string? _ultraStarTxt;
 
     /// <summary>
     /// Set by every mutation and cleared once the record has been written to SQLite.
@@ -33,6 +36,24 @@ public class SongRecord
     public required Guid Id { get; init; }
 
     public required string Url { get; init; }
+
+    public SongSource Source
+    {
+        get => _source;
+        set { _source = value; IsDirty = true; }
+    }
+
+    public int? UsdbSongId
+    {
+        get => _usdbSongId;
+        set { _usdbSongId = value; IsDirty = true; }
+    }
+
+    public string? UltraStarTxt
+    {
+        get => _ultraStarTxt;
+        set { _ultraStarTxt = value; IsDirty = true; }
+    }
 
     public string? Title
     {
@@ -161,7 +182,9 @@ public class SongRecord
         BeganProcessingAt = BeganProcessingAt,
         CompletedAt = CompletedAt,
         UltraStarTxtPath = UltraStarTxtPath,
-        FetchedAt = FetchedAt
+        FetchedAt = FetchedAt,
+        Source = Source,
+        UsdbSongId = UsdbSongId
     };
 
     /// <summary>
@@ -178,7 +201,7 @@ public class SongRecord
             return new SongSnapshot(
                 Id, Url, Title, JobId, State, CreatedAt,
                 BeganProcessingAt, CompletedAt, UltraStarTxtPath,
-                BundlePath, FetchedAt,
+                BundlePath, FetchedAt, Source, UsdbSongId, UltraStarTxt,
                 _log.ToString(), _errors.ToString());
         }
     }
@@ -190,7 +213,10 @@ public class SongRecord
         {
             Id = snapshot.Id,
             Url = snapshot.Url,
-            CreatedAt = snapshot.CreatedAt
+            CreatedAt = snapshot.CreatedAt,
+            Source = snapshot.Source,
+            UsdbSongId = snapshot.UsdbSongId,
+            UltraStarTxt = snapshot.UltraStarTxt
         };
 
         record._title = snapshot.Title;
@@ -221,5 +247,8 @@ public record SongSnapshot(
     string? UltraStarTxtPath,
     string? BundlePath,
     DateTime? FetchedAt,
+    SongSource Source,
+    int? UsdbSongId,
+    string? UltraStarTxt,
     string Log,
     string Errors);
